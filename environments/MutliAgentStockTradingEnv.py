@@ -9,6 +9,11 @@ from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 
 class MultiAgentStockTradingEnv(MultiAgentEnv, gym.Env):
 
+    """
+    Multi-Agent Wrapper for StockTradingEnv
+    Accepts multi-agent actions and is compatible with RLLib
+    """
+
     NAME = "MultiAgentStockTradingEnv"
     NUM_ACTIONS = None
     NUM_AGENTS = 2
@@ -31,3 +36,15 @@ class MultiAgentStockTradingEnv(MultiAgentEnv, gym.Env):
             rewards.append(reward)
             dones.append(done)
         return state, rewards, dones
+
+    @override(gym.Env)
+    def reset(self):
+        return self.base_env.reset()
+
+    @override(gym.Env)
+    def close(self):
+        return self.base_env.close()
+
+    @override(gym.Env)
+    def render(self):
+        return self.base_env.render()
