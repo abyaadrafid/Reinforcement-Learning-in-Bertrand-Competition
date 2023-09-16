@@ -2,6 +2,7 @@ from typing import Dict, Optional
 
 import gym
 import numpy as np
+from gym.spaces import Box, Discrete
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import override
 from sklearn.preprocessing import normalize
@@ -14,8 +15,31 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         if not config:
             config = {}
 
+        # RLLib Compatibility
+        action_space = None
+        observation_space = None
+
         self.parse_config(config)
+        self._init_spaces()
         self._init_states()
+
+    def _init_spaces(self):
+
+        """
+        Initialize spaces for RLLib compatibility
+        """
+        # if self.action_type is "Discrete" :
+        # Use when we decide to allow continuous action spaces
+
+        self.action_space = Discrete(5)
+
+        self.observation_space = Box(
+            low=self.min_price,
+            high=self.max_price,
+            shape=(self.memory_size, self.num_seller),
+            dtype="uint8",
+        )
+        self.n_features = self.memory_size * self.num_seller
 
     def _init_states(self):
 
@@ -45,10 +69,13 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     def parse_config(self, config):
         self.num_customer = config.get("num_customer", 3000)
         self.max_price = config.get("max_price", 1200)
-        self.min_price = config.get("min_price", 50)
+        self.min_price = config.get("min_price", 500)
         self.num_seller = config.get("num_seller", 2)
         self.max_capacity = config.get("max_capacity", 2000)
         self.memory_size = config.get("memory_size", 5)
+        self.action_type = config.get(
+            "action_type", "Discrete"
+        )  # can be continous (not super good for DQN)
 
     @override(gym.Env)
     def step(self, actions: list[int]):
