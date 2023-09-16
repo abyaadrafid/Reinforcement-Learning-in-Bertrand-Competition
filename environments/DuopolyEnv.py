@@ -4,6 +4,7 @@ import gym
 import numpy as np
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import override
+from sklearn.preprocessing import normalize
 
 from utils.market import Market
 
@@ -17,12 +18,29 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         self._init_states()
 
     def _init_states(self):
+
+        # Generate random state
         prices = np.random.uniform(
             self.min_price, self.max_price, (self.memory_size, self.num_seller)
         )
-        sold = np.random.uniform(0, self.max_capacity, (self.memory_size, 1))
-        self.states = np.hstack((prices, sold))
-        self.market = Market(self.num_seller, self.num_customer, self.max_capacity)
+
+        """
+        Maybe use number of sold/unsold items as additional inputs too
+        """
+        # sold = np.random.uniform(0, self.max_capacity, (self.memory_size, self.num_seller))
+        # self.states = np.hstack((prices, sold))
+        self.states = prices
+        self.market = Market(
+            self.num_seller,
+            self.num_customer,
+            self.max_capacity,
+            self.max_price,
+            self.min_price,
+        )
+
+    def _create_states(self, actions: list[int]):
+        np.roll(self.states, -self.states.shape[1])
+        self.states[-1] = actions
 
     def parse_config(self, config):
         self.num_customer = config.get("num_customer", 3000)
@@ -34,7 +52,12 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
     @override(gym.Env)
     def step(self, actions: list[int]):
-        self.market.allocate_items(actions)
+        self._create_states(actions)
+        revenue = np.array(self.market.allocate_items(actions))
+
+        # My understanding : large reward signals arent usually the best thing
+        rewards = normalize(revenue)
+        return self.states, rewards, False, {}  # next_state, rewards, dones, info
 
     @override(gym.Env)
     def reset(self):
