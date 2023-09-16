@@ -7,25 +7,27 @@ import numpy as np
 class DemandFunction:
     """Class that generates a demand function"""
 
-    def __init__(self, N=100):
-        self.no_consumers = N
-        self.demand = np.array([])
+    def __init__(self, num_customer=100):
+        self.num_customer = num_customer
 
     def generate_linear(self, min_price, max_price):
+        """Deterministic demand function"""
         demand = np.zeros(max_price - min_price)
         i = 0
+        consumer_prices = np.random.uniform(min_price, max_price, self.num_customer)
         for price in range(min_price, max_price):
 
             demand[i] = sum(price <= bid for bid in consumer_prices)
             i += 1
+        self.demand = demand
 
     def generate_uniform(self, min_price, max_price):
         """Generates uniformly distributed demand function"""
-        self.demand = np.random.uniform(min_price, max_price, self.no_consumers)
+        self.demand = np.random.uniform(min_price, max_price, self.num_customer)
 
     def generate_normal(self, mean, standard_deviation):
         """Generates normal distributed demand function"""
-        self.demand = np.random.normal(mean, standard_deviation, self.no_consumers)
+        self.demand = np.random.normal(mean, standard_deviation, self.num_customer)
 
     def get_demand(self):
         """Returns demand function"""
@@ -64,15 +66,15 @@ class DemandFunction:
 class Market:
     """Class that is supposed to match consumers with sellers"""
 
-    def __init__(self):
+    def __init__(self, num_seller: int, num_customer: int):
         self.seller = []
-        self.demand = DemandFunction()
-        self.no_of_sellers = 0
+        self.demand = DemandFunction(num_customer)
+        self.num_seller = num_seller
 
     def add_seller(self, seller):
         """Adds seller to the market"""
         self.seller.append(seller)
-        self.no_of_sellers += 1
+        self.num_seller += 1
 
     def set_demand(self, demand):
         """Sets demand function"""
@@ -115,7 +117,7 @@ class Market:
         swapped = True
         while swapped:
             swapped = False
-            for i in range(self.no_of_sellers - 1):
+            for i in range(self.num_seller - 1):
                 if self.seller[i].get_price() > self.seller[i + 1].get_price():
                     temp1 = self.seller[i]
                     temp2 = self.seller[i + 1]

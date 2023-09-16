@@ -35,7 +35,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         self.memory_size = config.get("memory_size", 5)
 
     def setup_entities(self):
-        self.market = Market()
+        self.market = Market(self.num_seller)
         self.sellers = Seller(
             name=["agent" + i for i in range(self.num_seller)],
             capacity=self.max_capacity,
@@ -43,7 +43,9 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
     @override(gym.Env)
     def step(self, actions: list[int]):
-        demand = self.market.demand.generate_linear(self.min_price, self.max_price)
+        self.market.demand.generate_linear(self.min_price, self.max_price)
+        demand = self.market.get_demand()
+        total_items = self.max_capacity * self.num_customer
 
     @override(gym.Env)
     def reset(self):
