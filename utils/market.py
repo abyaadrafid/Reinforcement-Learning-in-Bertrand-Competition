@@ -3,6 +3,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+"""
+This module implements the underlying market functions
+"""
+
 
 class DemandFunction:
     """Class that generates a demand function"""
@@ -10,7 +14,7 @@ class DemandFunction:
     def __init__(self, num_customer=100):
         self.num_customer = num_customer
 
-    def generate_linear(self, min_price, max_price):
+    def generate_unform(self, min_price, max_price):
         """Deterministic demand function"""
         demand = np.zeros(max_price - min_price)
         i = 0
@@ -20,14 +24,6 @@ class DemandFunction:
             demand[i] = sum(price <= bid for bid in consumer_prices)
             i += 1
         self.demand = demand
-
-    def generate_uniform(self, min_price, max_price):
-        """Generates uniformly distributed demand function"""
-        self.demand = np.random.uniform(min_price, max_price, self.num_customer)
-
-    def generate_normal(self, mean, standard_deviation):
-        """Generates normal distributed demand function"""
-        self.demand = np.random.normal(mean, standard_deviation, self.num_customer)
 
     def get_demand(self):
         """Returns demand function"""
@@ -79,7 +75,7 @@ class Market:
 
     def add_seller(self, seller):
         """Adds seller to the market"""
-        self.seller.append(seller)
+        self.sellers.append(seller)
         self.num_seller += 1
 
     def set_demand(self, demand):
@@ -99,7 +95,7 @@ class Market:
         no_of_consumers = len(self.get_demand().get_demand())
 
         # Plotting seller prices
-        for seller in self.seller:
+        for seller in self.sellers:
             plt.plot((0, no_of_consumers), (seller.get_price(), seller.get_price()))
             plt.text(1, seller.get_price() + 1, seller.get_name())
 
@@ -107,34 +103,32 @@ class Market:
         plt.legend()
         plt.show()
 
-    def allocate_items(self):
-        """Market clearing function"""
+    def allocate_items(self, prices: list[int], render: bool = False):
+        # Set seller prices
+        # Storing last price if needed
+        for index, price in enumerate(prices):
+            self.sellers[index].set_price(price)
 
-        # Resetting sellers
-        for seller in self.seller:
-            seller.empty_inventory()
+        # Restock
+        for seller in self.sellers:
+            seller.restock_inventory()
 
-        """
-        for seller in self.seller:
-            print(seller.get_price())
-        """
-
-        # Sorting seller prices by bubble sort
+        # Sort Sellers according to increasing prices
         swapped = True
         while swapped:
             swapped = False
             for i in range(self.num_seller - 1):
-                if self.seller[i].get_price() > self.seller[i + 1].get_price():
-                    temp1 = self.seller[i]
-                    temp2 = self.seller[i + 1]
-                    self.seller[i] = temp2
-                    self.seller[i + 1] = temp1
+                if self.sellers[i].get_price() > self.sellers[i + 1].get_price():
+                    temp1 = self.sellers[i]
+                    temp2 = self.sellers[i + 1]
+                    self.sellers[i] = temp2
+                    self.sellers[i + 1] = temp1
                     swapped = True
 
         # Items are sold
         temp_demand = np.sort(self.demand.get_demand())
 
-        for seller in self.seller:
+        for seller in self.sellers:
             i = 0
             for consumer_price in temp_demand:
 
@@ -147,31 +141,32 @@ class Market:
 
             temp_demand = temp_demand[i:-1]
 
-        print("--------------------")
-        print("No of consumers: ", len(self.demand.get_demand()), "\n")
-
-        print(
-            "{:<15s} {:>13s} {:>13s} {:>13s} {:>13s}".format(
-                "seller", "Capacity", "Items left", "Item price", "Revenue"
-            )
-        )
-
-        for seller in self.seller:
-            revenue = (
-                seller.get_capacity() - seller.get_items_left()
-            ) * seller.get_price()
+        if render:
+            print("--------------------")
+            print("No of consumers: ", len(self.demand.get_demand()), "\n")
 
             print(
-                "{:<15s} {:>13d} {:>13d} {:>13d} {:>13}".format(
-                    seller.get_name(),
-                    seller.get_capacity(),
-                    seller.get_items_left(),
-                    seller.get_price(),
-                    revenue,
+                "{:<15s} {:>13s} {:>13s} {:>13s} {:>13s}".format(
+                    "seller", "Capacity", "Items left", "Item price", "Revenue"
                 )
             )
 
-        print("--------------------")
+            for seller in self.sellers:
+                revenue = (
+                    seller.get_capacity() - seller.get_items_left()
+                ) * seller.get_price()
+
+                print(
+                    "{:<15s} {:>13d} {:>13d} {:>13d} {:>13}".format(
+                        seller.get_name(),
+                        seller.get_capacity(),
+                        seller.get_items_left(),
+                        seller.get_price(),
+                        revenue,
+                    )
+                )
+
+            print("--------------------")
 
 
 class Seller:
@@ -208,8 +203,8 @@ class Seller:
         """Reduces number of availables items by 1"""
         self.items_left -= 1
 
-    def empty_inventory(self):
-        """Empties plane: the number of items left is set equal to capacity"""
+    def restock_inventory(self):
+        """Restocks Items: the number of items left is set equal to capacity"""
         self.items_left = self.capacity
 
     def get_name(self):
