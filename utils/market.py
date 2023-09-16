@@ -66,11 +66,14 @@ class DemandFunction:
 class Market:
     """Class that is supposed to match consumers with sellers"""
 
-    def __init__(self, num_seller: int, num_customer: int):
+    def __init__(self, num_seller: int, num_customer: int, max_capacity: int):
+        # To make it more flexible, read from config send capacities as a dict
+
         self.demand = DemandFunction(num_customer)
         self.num_seller = num_seller
+        self.max_capacity = max_capacity
         self.sellers = Seller(
-            name=["agent" + i for i in range(self.num_seller)],
+            name=["agent" + str(i) for i in range(self.num_seller)],
             capacity=self.max_capacity,
         )
 
