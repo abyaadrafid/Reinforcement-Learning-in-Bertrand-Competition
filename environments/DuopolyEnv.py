@@ -2,20 +2,29 @@ from typing import Dict, Optional
 
 import gym
 import numpy as np
+from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import override
 
 from utils.market import Market, Seller
 
 
-class DuopolyEnv(gym.Env):
+class DuopolyEnv(MultiAgentEnv, gym.Env):
     def __init__(self, config: Optional[Dict]) -> None:
         if not config:
             config = {}
 
         self.parse_config()
+        self.init_states()
+
+    def init_states(self):
+        prices = np.random.uniform(
+            self.min_price, self.max_price, (self.num_seller, self.memory_size)
+        )
+        sold = np.random.uniform(0, self.max_capacity, (self.memory_size, 1))
+        self.states = np.hstack(prices, sold)
 
     def parse_config(self, config):
-        self.num_customer = config.get("num_customer", 200)
+        self.num_customer = config.get("num_customer", 3000)
         self.max_price = config.get("max_price", 1200)
         self.min_price = config.get("min_price", 50)
         self.num_seller = config.get("num_seller", 2)
@@ -23,6 +32,7 @@ class DuopolyEnv(gym.Env):
         self.price_preference = np.random.uniform(
             self.max_price, self.min_price, self.num_customer
         )
+        self.memory_size = config.get("memory_size", 5)
 
     def setup_entities(self):
         self.market = Market()
@@ -32,8 +42,8 @@ class DuopolyEnv(gym.Env):
         )
 
     @override(gym.Env)
-    def step(self):
-        pass
+    def step(self, actions: list[int]):
+        demand = self.market.demand.generate_linear(self.min_price, self.max_price)
 
     @override(gym.Env)
     def reset(self):
