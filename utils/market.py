@@ -67,9 +67,12 @@ class Market:
     """Class that is supposed to match consumers with sellers"""
 
     def __init__(self, num_seller: int, num_customer: int):
-        self.seller = []
         self.demand = DemandFunction(num_customer)
         self.num_seller = num_seller
+        self.sellers = Seller(
+            name=["agent" + i for i in range(self.num_seller)],
+            capacity=self.max_capacity,
+        )
 
     def add_seller(self, seller):
         """Adds seller to the market"""

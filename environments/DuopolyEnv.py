@@ -5,7 +5,7 @@ import numpy as np
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import override
 
-from utils.market import Market, Seller
+from utils.market import Market
 
 
 class DuopolyEnv(MultiAgentEnv, gym.Env):
@@ -15,6 +15,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
         self.parse_config()
         self.init_states()
+        self.market = Market(self.num_seller)
 
     def init_states(self):
         prices = np.random.uniform(
@@ -34,18 +35,9 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         )
         self.memory_size = config.get("memory_size", 5)
 
-    def setup_entities(self):
-        self.market = Market(self.num_seller)
-        self.sellers = Seller(
-            name=["agent" + i for i in range(self.num_seller)],
-            capacity=self.max_capacity,
-        )
-
     @override(gym.Env)
     def step(self, actions: list[int]):
-        self.market.demand.generate_linear(self.min_price, self.max_price)
-        demand = self.market.get_demand()
-        total_items = self.max_capacity * self.num_customer
+        self.market.allocate_items(actions, self.max_capacity)
 
     @override(gym.Env)
     def reset(self):
