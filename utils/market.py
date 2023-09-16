@@ -11,19 +11,14 @@ This module implements the underlying market functions
 class DemandFunction:
     """Class that generates a demand function"""
 
-    def __init__(self, num_customer=100):
+    def __init__(self, max_price: int, min_price: int, num_customer=100):
         self.num_customer = num_customer
+        self.generate_unform(min_price, max_price)
 
     def generate_unform(self, min_price, max_price):
         """Deterministic demand function"""
-        demand = np.zeros(max_price - min_price)
-        i = 0
         consumer_prices = np.random.uniform(min_price, max_price, self.num_customer)
-        for price in range(min_price, max_price):
-
-            demand[i] = sum(price <= bid for bid in consumer_prices)
-            i += 1
-        self.demand = demand
+        self.demand = consumer_prices
 
     def get_demand(self):
         """Returns demand function"""
@@ -62,16 +57,26 @@ class DemandFunction:
 class Market:
     """Class that is supposed to match consumers with sellers"""
 
-    def __init__(self, num_seller: int, num_customer: int, max_capacity: int):
+    def __init__(
+        self,
+        num_seller: int,
+        num_customer: int,
+        max_capacity: int,
+        max_price,
+        min_price,
+    ):
         # To make it more flexible, read from config send capacities as a dict
 
-        self.demand = DemandFunction(num_customer)
+        self.demand = DemandFunction(max_price, min_price, num_customer)
         self.num_seller = num_seller
         self.max_capacity = max_capacity
-        self.sellers = Seller(
-            name=["agent" + str(i) for i in range(self.num_seller)],
-            capacity=self.max_capacity,
-        )
+        self.sellers = [
+            Seller(
+                name="agent" + str(i),
+                capacity=self.max_capacity,
+            )
+            for i in range(self.num_seller)
+        ]
 
     def add_seller(self, seller):
         """Adds seller to the market"""
@@ -214,3 +219,10 @@ class Seller:
     def set_name(self, new_name):
         """Sets name of airline"""
         self.name = new_name
+
+
+if __name__ == "__main__":
+    market = Market(3, 500, 200, 30, 20)
+    for seller in market.sellers:
+        print(seller.get_price())
+    market.allocate_items([14, 16, 15], render=True)
