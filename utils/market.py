@@ -11,6 +11,14 @@ class DemandFunction:
         self.no_consumers = N
         self.demand = np.array([])
 
+    def generate_linear(self, min_price, max_price):
+        demand = np.zeros(max_price - min_price)
+        i = 0
+        for price in range(min_price, max_price):
+
+            demand[i] = sum(price <= bid for bid in consumer_prices)
+            i += 1
+
     def generate_uniform(self, min_price, max_price):
         """Generates uniformly distributed demand function"""
         self.demand = np.random.uniform(min_price, max_price, self.no_consumers)
