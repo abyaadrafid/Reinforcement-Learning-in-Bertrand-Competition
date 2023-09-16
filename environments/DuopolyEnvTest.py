@@ -35,8 +35,7 @@ class TestDuopolyEnvConfigs(unittest.TestCase):
         states = self.env.reset()
 
         self.assertEqual(states.shape[0], self.MEMORY_SIZE)
-        # We also take the number of previously sold items
-        self.assertEqual(states.shape[1], self.NUM_SELLER + 1)
+        self.assertEqual(states.shape[1], self.NUM_SELLER)
 
     def test_num_customer(self):
         self.env_config = {"num_customer": self.NUM_CUSTOMER}

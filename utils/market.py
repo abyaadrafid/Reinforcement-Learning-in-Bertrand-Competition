@@ -13,9 +13,9 @@ class DemandFunction:
 
     def __init__(self, max_price: int, min_price: int, num_customer=100):
         self.num_customer = num_customer
-        self.generate_unform(min_price, max_price)
+        self.generate_unform(max_price, min_price)
 
-    def generate_unform(self, min_price, max_price):
+    def generate_unform(self, max_price, min_price):
         """Deterministic demand function"""
         consumer_prices = np.random.uniform(min_price, max_price, self.num_customer)
         self.demand = consumer_prices
@@ -62,8 +62,8 @@ class Market:
         num_seller: int,
         num_customer: int,
         max_capacity: int,
-        max_price,
-        min_price,
+        max_price: int,
+        min_price: int,
     ):
         # To make it more flexible, read from config send capacities as a dict
 
@@ -145,33 +145,44 @@ class Market:
                     i += 1
 
             temp_demand = temp_demand[i:-1]
+        all_revenue = []
+        for seller in self.sellers:
+            revenue = (
+                seller.get_capacity() - seller.get_items_left()
+            ) * seller.get_price()
+            all_revenue.append(revenue)
 
         if render:
-            print("--------------------")
-            print("No of consumers: ", len(self.demand.get_demand()), "\n")
+            self.print_info()
+        return all_revenue
+
+    def print_info(self):
+
+        print("--------------------")
+        print("No of consumers: ", len(self.demand.get_demand()), "\n")
+
+        print(
+            "{:<15s} {:>13s} {:>13s} {:>13s} {:>13s}".format(
+                "seller", "Capacity", "Items left", "Item price", "Revenue"
+            )
+        )
+
+        for seller in self.sellers:
+            revenue = (
+                seller.get_capacity() - seller.get_items_left()
+            ) * seller.get_price()
 
             print(
-                "{:<15s} {:>13s} {:>13s} {:>13s} {:>13s}".format(
-                    "seller", "Capacity", "Items left", "Item price", "Revenue"
+                "{:<15s} {:>13d} {:>13d} {:>13d} {:>13}".format(
+                    seller.get_name(),
+                    seller.get_capacity(),
+                    seller.get_items_left(),
+                    seller.get_price(),
+                    revenue,
                 )
             )
 
-            for seller in self.sellers:
-                revenue = (
-                    seller.get_capacity() - seller.get_items_left()
-                ) * seller.get_price()
-
-                print(
-                    "{:<15s} {:>13d} {:>13d} {:>13d} {:>13}".format(
-                        seller.get_name(),
-                        seller.get_capacity(),
-                        seller.get_items_left(),
-                        seller.get_price(),
-                        revenue,
-                    )
-                )
-
-            print("--------------------")
+        print("--------------------")
 
 
 class Seller:
@@ -222,7 +233,7 @@ class Seller:
 
 
 if __name__ == "__main__":
-    market = Market(3, 500, 200, 30, 20)
+    market = Market(2, 500, 200, 30, 20)
     for seller in market.sellers:
         print(seller.get_price())
-    market.allocate_items([14, 16, 15], render=True)
+    print(market.allocate_items([22, 20], render=True))
