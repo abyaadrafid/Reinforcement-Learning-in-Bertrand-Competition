@@ -1,11 +1,10 @@
 from typing import Dict, Optional
 
-import gym
+import gymnasium as gym
 import numpy as np
 from gym.spaces import Box, Discrete
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import override
-from sklearn.preprocessing import normalize
 
 from utils.market import Market
 
@@ -16,6 +15,14 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         if not config:
             config = {}
 
+        self.action_space = Box(low=20, high=1500, shape=(2,), dtype=np.int32)
+
+        self.observation_space = Box(
+            low=20,
+            high=1500,
+            shape=(10,),
+            dtype=np.int32,
+        )
         # RLLib Compatibility
         self.parse_config(config)
         self._init_spaces()
@@ -31,15 +38,6 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         """
         # if self.action_type is "Discrete" :
         # Use when we decide to allow continuous action spaces
-
-        self.action_space = Discrete(5)
-
-        self.observation_space = Box(
-            low=self.min_price,
-            high=self.max_price,
-            shape=(self.memory_size, self.num_seller),
-            dtype="int16",
-        )
         self.n_features = self.memory_size * self.num_seller
         self._agent_ids = ["agent" + str(i) for i in range(self.num_seller)]
 
@@ -49,7 +47,8 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         prices = np.random.randint(
             low=self.min_price,
             high=self.max_price,
-            size=(self.memory_size, self.num_seller),
+            size=(self.memory_size * self.num_seller),
+            dtype=np.int32,
         )
 
         """
@@ -58,6 +57,8 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         # sold = np.random.uniform(0, self.max_capacity, (self.memory_size, self.num_seller))
         # self.states = np.hstack((prices, sold))
         self.states = prices
+        self.rewards = np.zeros(shape=(self.num_seller))
+
         self.market = Market(
             self.num_seller,
             self.num_customer,
@@ -67,8 +68,9 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         )
 
     def _create_states(self, actions: list[int]):
-        np.roll(self.states, -self.states.shape[1])
-        self.states[-1] = actions
+        np.roll(self.states, -self.num_customer)
+        for i, action in enumerate(actions):
+            self.states[self.memory_size * self.num_seller - i - 1] = action
 
     def parse_config(self, config):
         self.num_customer = config.get("num_customer", 3000)
@@ -84,31 +86,29 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
     @override(gym.Env)
     def step(self, actions: Dict):
-        print(actions)
 
         if actions:
             actions = self._from_RLLib_API_to_list(actions)
-            print(actions)
 
             self._create_states(actions)
-            revenue = np.array(self.market.allocate_items(actions))
+            self.rewards = np.array(
+                self.market.allocate_items(actions), dtype=np.float32
+            )
 
-            # My understanding : large reward signals arent usually the best thing
-            rewards = normalize(revenue)
-            return (
-                self._build_observation_dictionary(),
-                rewards,
-                False,
-                False,
-                {},
-            )  # next_state, rewards, dones, info
-        else:
-            return self._build_observation_dictionary(), 0, False, False, {}
+        return self._build_dictionary()
+        # next_state, rewards, dones, truncated, infos
 
     @override(gym.Env)
     def reset(self, *, seed=None, options=None):
         self._init_states()
-        return self._build_observation_dictionary(), {}
+        (
+            states,
+            _,
+            _,
+            _,
+            infos,
+        ) = self._build_dictionary()  # next_states, rewards, dones, truncated, infos
+        return states, infos
 
     @override(gym.Env)
     def close(self):
@@ -118,16 +118,24 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     def render(self):
         pass
 
-    def _build_observation_dictionary(self):
+    def _build_dictionary(self, reward=None):
         """
         Create dictonary of PlayerID:Observation for RLLib support
         """
 
-        observation = {}
+        states = {}
+        rewards = {}
+        dones = {}
+        truncateds = {}
+        infos = {}
         for i in range(self.num_seller):
-            observation[self.seller_ids[i]] = self.states
+            states[self.seller_ids[i]] = self.states
+            rewards[self.seller_ids[i]] = self.rewards[i]
+            dones[self.seller_ids[i]] = False
+            truncateds[self.seller_ids[i]] = False
+            infos[self.seller_ids[i]] = {}
 
-        return observation
+        return states, rewards, dones, truncateds, infos
 
     def _from_RLLib_API_to_list(self, actions):
         """
@@ -138,7 +146,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
     def _to_RLLib_API(self, observations, rewards, ep_is_done, info):
         """
-        Turn our list of observations and rewards into dictoraries
+        Turn our list of observations and rewards into dictonaries
         """
 
         states_list = {}
