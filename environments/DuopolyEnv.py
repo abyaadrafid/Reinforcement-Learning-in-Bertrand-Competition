@@ -6,7 +6,13 @@ from gym.spaces import Box, Discrete
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import override
 
+import wandb
 from utils.market import Market
+
+# WandB logging NEEDS TO BE MOVED OUT OF ENV IMP
+wandb.init()
+agent0_price_table = wandb.Table(columns=["price_value_0"])
+agent1_price_table = wandb.Table(columns=["price_value_1"])
 
 
 class DuopolyEnv(MultiAgentEnv, gym.Env):
@@ -14,8 +20,11 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         super().__init__()
         if not config:
             config = {}
-
+        self.curstep = 0
         self.action_space = Box(low=20, high=1500, shape=(1,), dtype=np.float32)
+
+        # THIS SHOULD NOT BE HERE
+        self.action_list = []
 
         self.observation_space = Box(
             low=20,
@@ -86,13 +95,13 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     @override(gym.Env)
     def step(self, actions: Dict):
         if actions:
+            self.curstep += 1
             actions = self._from_RLLib_API_to_list(actions)
             actions = self._validate_actions(actions)
             self._create_states(actions)
             self.rewards = np.array(
                 self.market.allocate_items(actions), dtype=np.float32
             )
-
         return self._build_dictionary()
         # next_state, rewards, dones, truncated, infos
 
@@ -125,7 +134,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
         return actions
 
-    def _build_dictionary(self, reward=None):
+    def _build_dictionary(self):
         """
         Create dictonary of PlayerID:Observation for RLLib support
         """
@@ -138,11 +147,14 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         for i in range(self.num_seller):
             states[self.seller_ids[i]] = self.states
             rewards[self.seller_ids[i]] = self.rewards[i]
-            dones[self.seller_ids[i]] = False
+            dones[self.seller_ids[i]] = False if self.curstep <= 500 else True
             truncateds[self.seller_ids[i]] = False
             infos[self.seller_ids[i]] = {}
-        dones["__all__"] = False
+        dones["__all__"] = False if self.curstep <= 500 else True
         truncateds["__all__"] = False
+        if self.curstep >= 500:
+            wandb.log({"agent0": agent0_price_table})
+            wandb.log({"agent1": agent1_price_table})
 
         return states, rewards, dones, truncateds, infos
 

@@ -5,10 +5,8 @@ sys.path.append("../")
 import ray
 from ray import tune
 from ray.air.config import RunConfig
+from ray.rllib.algorithms.callbacks import DefaultCallbacks
 from ray.rllib.algorithms.ppo import PPOConfig
-from ray.rllib.core.rl_module.marl_module import MultiAgentRLModuleSpec
-from ray.rllib.core.rl_module.rl_module import SingleAgentRLModuleSpec
-from ray.rllib.examples.models.shared_weights_model import TorchSharedWeightsModel
 from ray.rllib.policy.policy import PolicySpec
 from ray.tune.registry import register_env
 
@@ -27,14 +25,19 @@ rllib_config = (
     .framework("torch")
     .multi_agent(
         policies={
-            "policy": PolicySpec(
+            "agent0": PolicySpec(
+                observation_space=env_creator(env_config).observation_space,
+                action_space=env_creator(env_config).action_space,
+                config=PPOConfig.overrides(framework_str="torch"),
+            ),
+            "agent1": PolicySpec(
                 observation_space=env_creator(env_config).observation_space,
                 action_space=env_creator(env_config).action_space,
                 config=PPOConfig.overrides(framework_str="torch"),
             ),
         },
-        policy_mapping_fn=lambda agent_id, *args, **kwargs: "policy",
-        policies_to_train=["policy"],
+        policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id,
+        policies_to_train=["agent0", "agent1"],
     )
 )
 
@@ -49,6 +52,7 @@ def main():
         param_space=rllib_config.to_dict(),
         run_config=RunConfig(stop=stop, verbose=1),
     ).fit()
+    print(results)
 
 
 if __name__ == "__main__":
