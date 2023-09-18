@@ -66,6 +66,7 @@ class Market:
         self.demand = DemandFunction(max_price, min_price, num_customer)
         self.num_seller = num_seller
         self.max_capacity = max_capacity
+        self.max_revenue = max_capacity * max_price
         self.sellers = [
             Seller(
                 name="agent" + str(i),
@@ -155,10 +156,7 @@ class Market:
 
         # Normalize revenue between 0 and 1, this will be the reward
         for i, revenue in enumerate(all_revenue):
-            all_revenue[i] = (all_revenue[i] - np.min(all_revenue)) / (
-                np.max(all_revenue) - np.min(all_revenue)
-            )
-
+            all_revenue[i] = (revenue / self.max_revenue) * 2 - 1
         return all_revenue
 
     def print_info(self):
