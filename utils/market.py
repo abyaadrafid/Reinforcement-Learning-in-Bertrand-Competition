@@ -3,10 +3,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-"""
-This module implements the underlying market functions
-"""
-
 
 class DemandFunction:
     """Class that generates a demand function"""
@@ -145,15 +141,25 @@ class Market:
                     i += 1
 
             temp_demand = temp_demand[i:-1]
-        all_revenue = []
-        for seller in self.sellers:
+
+        all_revenue = np.zeros(
+            self.num_seller,
+        )
+        for i, seller in enumerate(self.sellers):
             revenue = (
                 seller.get_capacity() - seller.get_items_left()
             ) * seller.get_price()
-            all_revenue.append(revenue)
+            all_revenue[i] = revenue
 
         if render:
             self.print_info()
+
+        # Normalize revenue between 0 and 1, this will be the reward
+        for i, revenue in enumerate(all_revenue):
+            all_revenue[i] = (all_revenue[i] - np.min(all_revenue)) / (
+                np.max(all_revenue) - np.min(all_revenue)
+            )
+
         return all_revenue
 
     def print_info(self):
