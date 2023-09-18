@@ -113,7 +113,6 @@ class Market:
         # Restock
         for seller in self.sellers:
             seller.restock_inventory()
-
         # Sort Sellers according to increasing prices
         swapped = True
         while swapped:

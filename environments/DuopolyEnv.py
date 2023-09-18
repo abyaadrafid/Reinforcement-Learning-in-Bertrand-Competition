@@ -15,13 +15,13 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         if not config:
             config = {}
 
-        self.action_space = Box(low=20, high=1500, shape=(2,), dtype=np.int32)
+        self.action_space = Box(low=20, high=1500, shape=(1,), dtype=np.float32)
 
         self.observation_space = Box(
             low=20,
             high=1500,
             shape=(10,),
-            dtype=np.int32,
+            dtype=np.float32,
         )
         # RLLib Compatibility
         self.parse_config(config)
@@ -44,11 +44,10 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     def _init_states(self):
 
         # Generate random state
-        prices = np.random.randint(
+        prices = np.random.uniform(
             low=self.min_price,
             high=self.max_price,
             size=(self.memory_size * self.num_seller),
-            dtype=np.int32,
         )
 
         """
@@ -70,7 +69,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     def _create_states(self, actions: list[int]):
         np.roll(self.states, -self.num_customer)
         for i, action in enumerate(actions):
-            self.states[self.memory_size * self.num_seller - i - 1] = action
+            self.states[self.memory_size * self.num_seller - i - 1] = action[i]
 
     def parse_config(self, config):
         self.num_customer = config.get("num_customer", 3000)
@@ -86,7 +85,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
     @override(gym.Env)
     def step(self, actions: Dict):
-
+        print(actions)
         if actions:
             actions = self._from_RLLib_API_to_list(actions)
 
