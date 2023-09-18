@@ -72,11 +72,11 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
             self.states[self.memory_size * self.num_seller - i - 1] = action
 
     def parse_config(self, config):
-        self.num_customer = config.get("num_customer", 3000)
-        self.max_price = config.get("max_price", 1200)
+        self.num_customer = config.get("num_customer", 200)
+        self.max_price = config.get("max_price", 900)
         self.min_price = config.get("min_price", 500)
         self.num_seller = config.get("num_seller", 2)
-        self.max_capacity = config.get("max_capacity", 1000)
+        self.max_capacity = config.get("max_capacity", 50)
         self.memory_size = config.get("memory_size", 5)
         self.seller_ids = config.get("agent_ids", ["agent0", "agent1"])
         self.action_type = config.get(
@@ -85,10 +85,9 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
     @override(gym.Env)
     def step(self, actions: Dict):
-        print(actions)
         if actions:
             actions = self._from_RLLib_API_to_list(actions)
-
+            actions = self._validate_actions(actions)
             self._create_states(actions)
             self.rewards = np.array(
                 self.market.allocate_items(actions), dtype=np.float32
@@ -116,6 +115,15 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     @override(gym.Env)
     def render(self):
         pass
+
+    def _validate_actions(self, actions):
+        for action in actions:
+            if action > self.max_price:
+                action = self.max_price
+            if action < self.min_price:
+                action = self.min_price
+
+        return actions
 
     def _build_dictionary(self, reward=None):
         """

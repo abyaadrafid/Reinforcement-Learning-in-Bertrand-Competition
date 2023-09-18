@@ -14,7 +14,7 @@ from ray.tune.registry import register_env
 
 from environments.DuopolyEnv import DuopolyEnv
 
-env_config = {"max_price": 1200, "min_price": 500, "memory_size": 5, "num_seller": 2}
+env_config = {"max_price": 900, "min_price": 500, "memory_size": 5, "num_seller": 2}
 
 
 def env_creator(env_config):
