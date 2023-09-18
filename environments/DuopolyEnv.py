@@ -69,7 +69,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     def _create_states(self, actions: list[int]):
         np.roll(self.states, -self.num_customer)
         for i, action in enumerate(actions):
-            self.states[self.memory_size * self.num_seller - i - 1] = action[i]
+            self.states[self.memory_size * self.num_seller - i - 1] = action
 
     def parse_config(self, config):
         self.num_customer = config.get("num_customer", 3000)
@@ -133,6 +133,8 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
             dones[self.seller_ids[i]] = False
             truncateds[self.seller_ids[i]] = False
             infos[self.seller_ids[i]] = {}
+        dones["__all__"] = False
+        truncateds["__all__"] = False
 
         return states, rewards, dones, truncateds, infos
 
@@ -142,21 +144,3 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         """
         actions = [actions[player_id] for player_id in self.seller_ids]
         return actions
-
-    def _to_RLLib_API(self, observations, rewards, ep_is_done, info):
-        """
-        Turn our list of observations and rewards into dictonaries
-        """
-
-        states_list = {}
-        rewards_list = {}
-        dones_list = {}
-
-        for i in range(self.NUM_AGENTS):
-            states_list[self.player_ids[i]] = observations[i]
-            rewards_list[self.player_ids[i]] = rewards[i]
-            dones_list[self.player_ids[i]] = ep_is_done
-
-        dones_list["__all__"] = ep_is_done
-
-        return states_list, rewards_list, dones_list, info
