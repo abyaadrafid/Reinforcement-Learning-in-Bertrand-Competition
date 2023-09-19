@@ -10,9 +10,9 @@ import wandb
 from utils.market import Market
 
 # WandB logging NEEDS TO BE MOVED OUT OF ENV IMP
-wandb.init()
-agent0_price_table = wandb.Table(columns=["price_value_0"])
-agent1_price_table = wandb.Table(columns=["price_value_1"])
+# wandb.init()
+# agent0_price_table = wandb.Table(columns=["price_value_0"])
+# agent1_price_table = wandb.Table(columns=["price_value_1"])
 
 
 class DuopolyEnv(MultiAgentEnv, gym.Env):
@@ -21,11 +21,10 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         if not config:
             config = {}
         self.curstep = 0
+        self.max_step = 500
         self.action_space = Box(low=20, high=1500, shape=(1,), dtype=np.float32)
 
         # THIS SHOULD NOT BE HERE
-        self.action_list = []
-
         self.observation_space = Box(
             low=20,
             high=1500,
@@ -49,6 +48,12 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         # Use when we decide to allow continuous action spaces
         self.n_features = self.memory_size * self.num_seller
         self._agent_ids = ["agent" + str(i) for i in range(self.num_seller)]
+        self.agent1_actions = np.zeros(
+            shape=(self.max_step + 2),
+        )
+        self.agent0_actions = np.zeros(
+            shape=(self.max_step + 2),
+        )
 
     def _init_states(self):
 
@@ -95,13 +100,17 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     @override(gym.Env)
     def step(self, actions: Dict):
         if actions:
-            self.curstep += 1
             actions = self._from_RLLib_API_to_list(actions)
             actions = self._validate_actions(actions)
+            if self.curstep < self.max_step:
+                self.agent0_actions[self.curstep] = actions[0]
+                self.agent1_actions[self.curstep] = actions[1]
             self._create_states(actions)
             self.rewards = np.array(
                 self.market.allocate_items(actions), dtype=np.float32
             )
+            self.curstep += 1
+
         return self._build_dictionary()
         # next_state, rewards, dones, truncated, infos
 
@@ -147,14 +156,17 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         for i in range(self.num_seller):
             states[self.seller_ids[i]] = self.states
             rewards[self.seller_ids[i]] = self.rewards[i]
-            dones[self.seller_ids[i]] = False if self.curstep <= 500 else True
+            dones[self.seller_ids[i]] = False if self.curstep <= self.max_step else True
             truncateds[self.seller_ids[i]] = False
             infos[self.seller_ids[i]] = {}
-        dones["__all__"] = False if self.curstep <= 500 else True
+        dones["__all__"] = False if self.curstep <= self.max_step else True
         truncateds["__all__"] = False
-        if self.curstep >= 500:
-            wandb.log({"agent0": agent0_price_table})
-            wandb.log({"agent1": agent1_price_table})
+
+        if self.curstep >= self.max_step:
+            average_a0 = np.mean(self.agent0_actions)
+            average_a1 = np.mean(self.agent1_actions)
+            print(f"Mean price set by agent0 is : {average_a0}")
+            print(f"Mean price set by agent1 is : {average_a1}")
 
         return states, rewards, dones, truncateds, infos
 
