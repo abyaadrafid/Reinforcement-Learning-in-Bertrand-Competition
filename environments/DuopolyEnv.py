@@ -9,12 +9,8 @@ from ray.rllib.utils import override
 import wandb
 from utils.market import Market
 
+
 # WandB logging NEEDS TO BE MOVED OUT OF ENV IMP
-# wandb.init()
-# agent0_price_table = wandb.Table(columns=["price_value_0"])
-# agent1_price_table = wandb.Table(columns=["price_value_1"])
-
-
 class DuopolyEnv(MultiAgentEnv, gym.Env):
     def __init__(self, seed: Optional[int], config: Optional[Dict] = None) -> None:
         super().__init__()
@@ -54,6 +50,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         self.agent0_actions = np.zeros(
             shape=(self.max_step + 2),
         )
+        self.last_actions = [0] * self.num_seller
 
     def _init_states(self):
 
@@ -105,6 +102,10 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
             if self.curstep < self.max_step:
                 self.agent0_actions[self.curstep] = actions[0]
                 self.agent1_actions[self.curstep] = actions[1]
+
+            for idx in range(self.num_seller):
+                self.last_actions[idx] = actions[idx]
+
             self._create_states(actions)
             self.rewards = np.array(
                 self.market.allocate_items(actions), dtype=np.float32
@@ -113,6 +114,9 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
         return self._build_dictionary()
         # next_state, rewards, dones, truncated, infos
+
+    def last(self):
+        return self.last_actions
 
     @override(gym.Env)
     def reset(self, *, seed=None, options=None):
@@ -165,9 +169,6 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         if self.curstep >= self.max_step:
             average_a0 = np.mean(self.agent0_actions)
             average_a1 = np.mean(self.agent1_actions)
-            print(f"Mean price set by agent0 is : {average_a0}")
-            print(f"Mean price set by agent1 is : {average_a1}")
-
         return states, rewards, dones, truncateds, infos
 
     def _from_RLLib_API_to_list(self, actions):
