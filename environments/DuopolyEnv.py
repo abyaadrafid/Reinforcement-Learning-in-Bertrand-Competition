@@ -111,6 +111,8 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
     @override(gym.Env)
     def reset(self, *, seed=None, options=None):
+        self.curstep = 0
+        self._init_spaces()
         self._init_states()
         (
             states,
