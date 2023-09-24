@@ -44,12 +44,6 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         # Use when we decide to allow continuous action spaces
         self.n_features = self.memory_size * self.num_seller
         self._agent_ids = ["agent" + str(i) for i in range(self.num_seller)]
-        self.agent1_actions = np.zeros(
-            shape=(self.max_step + 2),
-        )
-        self.agent0_actions = np.zeros(
-            shape=(self.max_step + 2),
-        )
         self.last_actions = [0] * self.num_seller
 
     def _init_states(self):
@@ -99,9 +93,6 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         if actions:
             actions = self._from_RLLib_API_to_list(actions)
             actions = self._validate_actions(actions)
-            if self.curstep < self.max_step:
-                self.agent0_actions[self.curstep] = actions[0]
-                self.agent1_actions[self.curstep] = actions[1]
 
             for idx in range(self.num_seller):
                 self.last_actions[idx] = actions[idx]
@@ -165,10 +156,6 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
             infos[self.seller_ids[i]] = {}
         dones["__all__"] = False if self.curstep <= self.max_step else True
         truncateds["__all__"] = False
-
-        if self.curstep >= self.max_step:
-            average_a0 = np.mean(self.agent0_actions)
-            average_a1 = np.mean(self.agent1_actions)
         return states, rewards, dones, truncateds, infos
 
     def _from_RLLib_API_to_list(self, actions):
