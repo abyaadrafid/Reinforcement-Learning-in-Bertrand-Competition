@@ -95,7 +95,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
             actions = self._validate_actions(actions)
 
             for idx in range(self.num_seller):
-                self.last_actions[idx] = actions[idx]
+                self.last_actions[idx] = float(actions[idx])
 
             self._create_states(actions)
             self.rewards = np.array(

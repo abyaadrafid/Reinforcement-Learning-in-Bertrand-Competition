@@ -30,7 +30,8 @@ class ActionLogger(DefaultCallbacks):
     ) -> None:
         envs = base_env.get_sub_environments()
         last_actions = envs[env_index].last()
-        self.price_table.add_data([last_actions[i].astype(float) for i in range(2)])
+        print(last_actions)
+        # self.price_table.add_data([last_actions[i].astype(float) for i in range(2)])
 
         return super().on_episode_step(
             worker=worker,
