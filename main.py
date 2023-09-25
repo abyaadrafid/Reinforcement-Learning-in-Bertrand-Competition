@@ -4,11 +4,12 @@ sys.path.append("../")
 
 import ray
 from ray import tune
-from ray.air.config import RunConfig
+from ray.air.config import RunConfig, ScalingConfig
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.policy.policy import PolicySpec
+from ray.train.rl import RLTrainer
 from ray.tune.registry import register_env
 
 import wandb
@@ -24,9 +25,11 @@ def env_creator(env_config):
 
 config = {
     "env": "duopoly_env",
-    "callbacks": ActionLogger,
     "framework": "torch",
-    "num_workers": 1,
+    "evaluation_num_workers": 1,
+    "evaluation_interval": 1,
+    "callbacks": ActionLogger,
+    "evaluation_config": {"input": "sampler"},
     "multiagent": {
         "policies": {
             "agent0": PolicySpec(
@@ -47,11 +50,19 @@ config = {
 
 def main():
     ray.init()
-    wandb.init(project="RLAC_TEST")
+    wandb.init(project="RLAC_Test")
+    env_creator(env_config=env_config)
     register_env("duopoly_env", env_creator)
-
-    stop = {"training_iteration": 2}
-    tune.run("PPO", stop=stop, config=config)
+    trainer = RLTrainer(
+        run_config=RunConfig(
+            stop={"training_iteration": 5},
+            callbacks=[WandbLoggerCallback(project="TEST_RLAC")],
+        ),
+        scaling_config=ScalingConfig(num_workers=2, use_gpu=False),
+        algorithm="PPO",
+        config=config,
+    )
+    result = trainer.fit()
 
 
 if __name__ == "__main__":
