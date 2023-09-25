@@ -16,8 +16,6 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         super().__init__()
         if not config:
             config = {}
-        self.curstep = 0
-        self.max_step = 500
         self.action_space = Box(low=20, high=1500, shape=(1,), dtype=np.float32)
 
         # THIS SHOULD NOT BE HERE
@@ -38,13 +36,14 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
     def _init_spaces(self):
 
         """
-        Initialize spaces for RLLib compatibility
+        Initialize spaces for RLLib compatibility, reset internal variables
         """
         # if self.action_type is "Discrete" :
         # Use when we decide to allow continuous action spaces
         self.n_features = self.memory_size * self.num_seller
         self._agent_ids = ["agent" + str(i) for i in range(self.num_seller)]
-        self.last_actions = [0] * self.num_seller
+        self.last_actions = np.zeros(shape=(self.num_seller, 0))
+        self.curstep = 0
 
     def _init_states(self):
 
@@ -82,6 +81,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         self.min_price = config.get("min_price", 500)
         self.num_seller = config.get("num_seller", 2)
         self.max_capacity = config.get("max_capacity", 50)
+        self.max_step = config.get("max_step", 500)
         self.memory_size = config.get("memory_size", 5)
         self.seller_ids = config.get("agent_ids", ["agent0", "agent1"])
         self.action_type = config.get(
@@ -111,7 +111,6 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
 
     @override(gym.Env)
     def reset(self, *, seed=None, options=None):
-        self.curstep = 0
         self._init_spaces()
         self._init_states()
         (
@@ -132,6 +131,9 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         pass
 
     def _validate_actions(self, actions):
+        """
+        Put actions in price range
+        """
         for action in actions:
             if action > self.max_price:
                 action = self.max_price
@@ -153,10 +155,10 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         for i in range(self.num_seller):
             states[self.seller_ids[i]] = self.states
             rewards[self.seller_ids[i]] = self.rewards[i]
-            dones[self.seller_ids[i]] = False if self.curstep <= self.max_step else True
+            dones[self.seller_ids[i]] = False if self.curstep < self.max_step else True
             truncateds[self.seller_ids[i]] = False
             infos[self.seller_ids[i]] = {}
-        dones["__all__"] = False if self.curstep <= self.max_step else True
+        dones["__all__"] = False if self.curstep < self.max_step else True
         truncateds["__all__"] = False
         return states, rewards, dones, truncateds, infos
 
