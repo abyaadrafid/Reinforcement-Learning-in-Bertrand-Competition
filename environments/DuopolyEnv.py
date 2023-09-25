@@ -6,11 +6,9 @@ from gym.spaces import Box, Discrete
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import override
 
-import wandb
 from utils.market import Market
 
 
-# WandB logging NEEDS TO BE MOVED OUT OF ENV IMP
 class DuopolyEnv(MultiAgentEnv, gym.Env):
     def __init__(self, seed: Optional[int], config: Optional[Dict] = None) -> None:
         super().__init__()
@@ -42,7 +40,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         # Use when we decide to allow continuous action spaces
         self.n_features = self.memory_size * self.num_seller
         self._agent_ids = ["agent" + str(i) for i in range(self.num_seller)]
-        self.last_actions = np.zeros(shape=(self.num_seller, 0))
+        self.action_memory = np.zeros(shape=(self.num_seller, self.max_step))
         self.curstep = 0
 
     def _init_states(self):
@@ -95,7 +93,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
             actions = self._validate_actions(actions)
 
             for idx in range(self.num_seller):
-                self.last_actions[idx] = float(actions[idx])
+                self.action_memory[idx][self.curstep] = actions[idx]
 
             self._create_states(actions)
             self.rewards = np.array(
@@ -106,8 +104,8 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         return self._build_dictionary()
         # next_state, rewards, dones, truncated, infos
 
-    def last(self):
-        return self.last_actions
+    def get_mean_prices(self):
+        return np.mean(self.action_memory, axis=1)
 
     @override(gym.Env)
     def reset(self, *, seed=None, options=None):
