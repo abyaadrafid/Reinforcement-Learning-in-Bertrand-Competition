@@ -23,7 +23,7 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         self.observation_space = Box(
             low=self.min_price,
             high=self.max_price,
-            shape=(10,),
+            shape=(self.memory_size * self.num_seller,),
             dtype=np.float32,
         )
         self._init_spaces()
@@ -70,16 +70,16 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         )
 
     def _create_states(self, actions: list[int]):
-        np.roll(self.states, -self.num_customer)
+        self.states = np.roll(self.states, -self.num_seller)
         for i, action in enumerate(actions):
             self.states[self.memory_size * self.num_seller - i - 1] = action
 
     def parse_config(self, config):
         self.num_customer = config.get("num_customer", 200)
-        self.max_price = config.get("max_price", 900)
-        self.min_price = config.get("min_price", 500)
+        self.max_price = config.get("max_price", 900.0)
+        self.min_price = config.get("min_price", 500.0)
         self.num_seller = config.get("num_seller", 2)
-        self.max_capacity = config.get("max_capacity", 50)
+        self.max_capacity = config.get("max_capacity", 100)
         self.max_step = config.get("max_step", 500)
         self.memory_size = config.get("memory_size", 5)
         self.seller_ids = config.get("agent_ids", ["agent0", "agent1"])
@@ -133,11 +133,11 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         """
         Put actions in price range
         """
-        for action in actions:
+        for i, action in enumerate(actions):
             if action > self.max_price:
-                action = self.max_price
+                actions[i] = self.max_price
             if action < self.min_price:
-                action = self.min_price
+                actions[i] = self.min_price
 
         return actions
 
