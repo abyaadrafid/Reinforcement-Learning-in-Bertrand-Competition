@@ -14,17 +14,18 @@ class DuopolyEnv(MultiAgentEnv, gym.Env):
         super().__init__()
         if not config:
             config = {}
-        self.action_space = Box(low=20, high=1500, shape=(1,), dtype=np.float32)
 
-        # THIS SHOULD NOT BE HERE
+        self.parse_config(config)
+
+        self.action_space = Box(
+            low=self.min_price, high=self.max_price, shape=(1,), dtype=np.float32
+        )
         self.observation_space = Box(
-            low=20,
-            high=1500,
+            low=self.min_price,
+            high=self.max_price,
             shape=(10,),
             dtype=np.float32,
         )
-        # RLLib Compatibility
-        self.parse_config(config)
         self._init_spaces()
         self._init_states()
 
