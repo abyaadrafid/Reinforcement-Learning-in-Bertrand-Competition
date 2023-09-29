@@ -1,5 +1,7 @@
 """This module is used to make simple Bertrand games"""
 
+import random
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -114,33 +116,24 @@ class Market:
         # Restock
         for seller in self.sellers:
             seller.restock_inventory()
-        # Sort Sellers according to increasing prices
-        swapped = True
-        while swapped:
-            swapped = False
-            for i in range(self.num_seller - 1):
-                if self.sellers[i].get_price() > self.sellers[i + 1].get_price():
-                    temp1 = self.sellers[i]
-                    temp2 = self.sellers[i + 1]
-                    self.sellers[i] = temp2
-                    self.sellers[i + 1] = temp1
-                    swapped = True
-
         # Items are sold
         temp_demand = np.sort(self.demand.get_demand())
 
-        for seller in self.sellers:
-            i = 0
-            for consumer_price in temp_demand:
+        # Consumer decides which seller to buy from
+        for consumer_prices in temp_demand:
+            checked_sellers = set()
 
-                if seller.get_items_left() > 0:
-
-                    if seller.get_price() < consumer_price:
-                        seller.sell_item()
-
-                    i += 1
-
-            temp_demand = temp_demand[i:-1]
+            while len(checked_sellers) < self.num_seller:
+                current_seller = random.choice(self.sellers)
+                if (
+                    current_seller not in checked_sellers
+                    and current_seller.get_items_left() > 0
+                    and current_seller.get_price() <= consumer_prices
+                ):
+                    current_seller.sell_item()
+                    break
+                else:
+                    checked_sellers.add(current_seller)
 
         all_revenue = np.zeros(
             self.num_seller,
@@ -236,7 +229,7 @@ class Seller:
 
 
 if __name__ == "__main__":
-    market = Market(2, 500, 200, 30, 20)
+    market = Market(2, 500, 200, 900, 500)
     for seller in market.sellers:
         print(seller.get_price())
-    print(market.allocate_items([22, 20], render=True))
+    print(market.allocate_items([900, 0], render=True))
