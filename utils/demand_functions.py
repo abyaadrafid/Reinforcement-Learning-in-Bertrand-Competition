@@ -9,9 +9,9 @@ class SimpleMarket:
         self.type = config.get("demand_type")
         match self.type:
             case "Logit":
-                self.demand_func = LogitDemand(config=config)
+                self.demand_func = LogitDemand(config=config.get("logit"))
             case "Linear":
-                self.demand_func = LinearDemand(config=config)
+                self.demand_func = LinearDemand(config=config.get("linear"))
             case default:
                 raise NotImplementedError("Use a defined demand type")
 
@@ -23,8 +23,8 @@ class SimpleMarket:
         Return the profits based on the prices
         """
         demand = self.get_demand(prices)
-        profits = (prices - self.cost) * demand
-        return profits
+        profits = (prices - self.demand_func.cost) * demand
+        return np.array(profits)
 
 
 class LogitDemand:
