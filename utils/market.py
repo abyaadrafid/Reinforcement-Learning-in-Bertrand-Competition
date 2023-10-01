@@ -148,8 +148,8 @@ class Market:
             self.print_info()
 
         # Normalize revenue between -1 and +1, this will be the reward
-        for i, revenue in enumerate(all_revenue):
-            all_revenue[i] = (revenue / self.max_revenue) * 2 - 1
+        # for i, revenue in enumerate(all_revenue):
+        #     all_revenue[i] = (revenue / self.max_revenue) * 2 - 1
         return all_revenue
 
     def print_info(self):
