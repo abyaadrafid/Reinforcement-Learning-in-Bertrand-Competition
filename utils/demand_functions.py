@@ -15,16 +15,16 @@ class SimpleMarket:
             case default:
                 raise NotImplementedError("Use a defined demand type")
 
-    def get_demand(self, prices):
-        return self.demand_func.demand(prices=prices)
-
     def compute_profit(self, prices):
         """
         Return the profits based on the prices
         """
-        demand = self.get_demand(prices)
+        prices = np.array(prices, dtype=np.float32).reshape(
+            -1,
+        )
+        demand = self.demand_func.demand(prices)
         profits = (prices - self.demand_func.cost) * demand
-        return np.array(profits)
+        return profits
 
 
 class LogitDemand:
