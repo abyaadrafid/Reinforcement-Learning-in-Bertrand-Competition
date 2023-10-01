@@ -2,7 +2,6 @@ from typing import Dict, Optional
 
 import gymnasium as gym
 import numpy as np
-from gym.spaces import Box, Discrete
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import override
 
@@ -31,8 +30,7 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
 
     def _init_internal_vars(self):
         self.n_features = self.memory_size * self.num_sellers
-        print(f"ENV N_FEATURES = {self.n_features}")
-        self._agent_ids = ["agent" + str(i) for i in range(self.num_sellers)]
+        self._agent_ids = self.seller_ids
         self.action_memory = np.zeros(shape=(self.num_sellers, self.max_steps))
         self.curstep = 0
 
@@ -70,11 +68,13 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
                 self.action_memory[idx][self.curstep] = actions[idx]
 
             self._create_states(actions)
-            self.rewards = self.market.compute_profit(np.array(actions))
+            self.rewards = self.market.compute_profit(actions)
             self.curstep += 1
-
         return self._build_dictionary()
         # next_state, rewards, dones, truncated, infos
+
+    def get_mean_prices(self):
+        return np.mean(self.action_memory, axis=1)
 
     def _from_RLLib_API_to_list(self, actions):
         """
@@ -95,7 +95,7 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
         infos = {}
         for i in range(self.num_sellers):
             states[self.seller_ids[i]] = self.states
-            rewards[self.seller_ids[i]] = np.float32(self.rewards[i])
+            rewards[self.seller_ids[i]] = self.rewards[i]
             dones[self.seller_ids[i]] = False if self.curstep < self.max_steps else True
             truncateds[self.seller_ids[i]] = (
                 False if self.curstep < self.max_steps else True
