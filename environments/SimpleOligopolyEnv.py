@@ -42,9 +42,15 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
         )
         self.rewards = np.zeros(shape=(self.num_sellers,))
 
+        if self.action_type == "disc":
+            self.possible_actions = [-2, -0.1414, -0.01, 0, 0.01, 0.1414, 2]
+
     def _create_states(self, actions: list):
         self.states = np.roll(self.states, -self.num_sellers)
+        print(actions)
         for i, action in enumerate(actions):
+            if self.action_type == "disc":
+                action = self.possible_actions[action]
             self.states[self.memory_size * self.num_sellers - i - 1] = action
 
     @override(gym.Env)

@@ -1,10 +1,13 @@
 import hydra
 import ray
 from gymnasium.spaces.box import Box
+from gymnasium.spaces.discrete import Discrete
 from omegaconf import DictConfig, OmegaConf
 from ray.air.config import RunConfig, ScalingConfig
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.rllib.algorithms.a2c import A2CConfig
+from ray.rllib.algorithms.ddpg import DDPGConfig
+from ray.rllib.algorithms.dqn import DQNConfig
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.policy.policy import PolicySpec
 from ray.train.rl import RLTrainer
@@ -23,17 +26,19 @@ def env_creator(env_config):
 def run(cfg: DictConfig):
     spaces = {
         "observation_space": Box(
-            low=cfg.env.min_price,
+            low=-cfg.env.max_price,
             high=cfg.env.max_price,
             shape=(cfg.env.memory_size * cfg.env.num_sellers,),
         ),
-        "action_space": Box(low=cfg.env.min_price, high=cfg.env.max_price, shape=(1,)),
+        "action_space": Box(low=-cfg.env.max_price, high=cfg.env.max_price, shape=(1,))
+        if cfg.env.action_type == "cont"
+        else Discrete(cfg.env.disc_action_size),
     }
     config = {
         "env": "duopoly_env",
-        "train_batch_size": 256,
+        "train_batch_size": 64,
         "env_config": spaces | OmegaConf.to_container(cfg.env),
-        "num_workers": 1,
+        "num_workers": 2,
         "framework": "torch",
         "callbacks": ActionLogger,
         "multiagent": {
@@ -41,12 +46,12 @@ def run(cfg: DictConfig):
                 "agent0": PolicySpec(
                     observation_space=env_creator(cfg.env).observation_space,
                     action_space=env_creator(cfg.env).action_space,
-                    config=A2CConfig.overrides(framework_str="torch"),
+                    config=DQNConfig.overrides(framework_str="torch"),
                 ),
                 "agent1": PolicySpec(
                     observation_space=env_creator(cfg.env).observation_space,
                     action_space=env_creator(cfg.env).action_space,
-                    config=A2CConfig.overrides(framework_str="torch"),
+                    config=DQNConfig.overrides(framework_str="torch"),
                 ),
             },
             "policy_mapping_fn": lambda agent_id, *args, **kwargs: agent_id,
@@ -61,12 +66,12 @@ def run(cfg: DictConfig):
     trainer = RLTrainer(
         run_config=RunConfig(
             # THIS WILL BE SET FROM CONFIG
-            stop={"training_iteration": 500},
+            stop={"training_iteration": 200},
             callbacks=[WandbLoggerCallback(project="RLAC_CUSTOM_METRICS")],
         ),
-        scaling_config=ScalingConfig(num_workers=1, use_gpu=False),
+        scaling_config=ScalingConfig(num_workers=2, use_gpu=False),
         # THIS WILL BE SET FROM CONFIG
-        algorithm="A2C",
+        algorithm="DQN",
         config=config,
     )
     result = trainer.fit()
@@ -88,5 +93,5 @@ def run(cfg: DictConfig):
 
 if __name__ == "__main__":
     ray.init()
-    wandb.init(project="RLAC_CUSTOM_METRICS", group="D_A2C_SYM_500_500")
+    wandb.init(project="RLAC_CUSTOM_METRICS", group="D_DQN_SYM_500_200")
     run()
