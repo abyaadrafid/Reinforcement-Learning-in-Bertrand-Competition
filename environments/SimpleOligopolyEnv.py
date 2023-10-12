@@ -47,7 +47,6 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
 
     def _create_states(self, actions: list):
         self.states = np.roll(self.states, -self.num_sellers)
-        print(actions)
         for i, action in enumerate(actions):
             if self.action_type == "disc":
                 action = self.possible_actions[action]
