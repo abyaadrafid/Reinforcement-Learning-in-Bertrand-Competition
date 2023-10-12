@@ -109,7 +109,6 @@ dependencies:
       - farama-notifications==0.0.4
       - fastapi==0.103.1
       - filelock==3.12.4
-      - finrl==0.3.6
       - fonttools==4.42.1
       - frozendict==2.3.8
       - frozenlist==1.4.0
