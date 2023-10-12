@@ -26,11 +26,11 @@ def env_creator(env_config):
 def run(cfg: DictConfig):
     spaces = {
         "observation_space": Box(
-            low=-cfg.env.max_price,
+            low=-cfg.env.min_price,
             high=cfg.env.max_price,
             shape=(cfg.env.memory_size * cfg.env.num_sellers,),
         ),
-        "action_space": Box(low=-cfg.env.max_price, high=cfg.env.max_price, shape=(1,))
+        "action_space": Box(low=-cfg.env.min_price, high=cfg.env.max_price, shape=(1,))
         if cfg.env.action_type == "cont"
         else Discrete(cfg.env.disc_action_size),
     }
