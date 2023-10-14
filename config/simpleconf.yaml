@@ -17,6 +17,7 @@ env :
       a : 2
     linear :
 training :
+  algo : 'DQN'
   exploration:
     type : 'EpsilonGreedy'
     initial_epsilon : 1.0

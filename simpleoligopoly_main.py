@@ -5,10 +5,6 @@ from gymnasium.spaces.discrete import Discrete
 from omegaconf import DictConfig, OmegaConf
 from ray.air.config import RunConfig, ScalingConfig
 from ray.air.integrations.wandb import WandbLoggerCallback
-from ray.rllib.algorithms.a2c import A2CConfig
-from ray.rllib.algorithms.ddpg import DDPGConfig
-from ray.rllib.algorithms.dqn import DQNConfig
-from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.policy.policy import PolicySpec
 from ray.train.rl import RLTrainer
 from ray.tune.registry import register_env
@@ -16,22 +12,11 @@ from ray.tune.registry import register_env
 import wandb
 from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
 from loggers.action_logger import ActionLogger, SharedMetrics
+from utils.algo_helpers import algo_config_builder
 
 
 def env_creator(env_config):
     return SimpleOligopolyEnv(seed=0, config=env_config)
-
-
-def exploration_config_builder(cfg):
-    config = DQNConfig()
-    config.exploration_config.update(
-        {
-            "initial_epsilon": cfg.initial_epsilon,
-            "final_epsilon": cfg.final_epsilon,
-            "epsilon_timesteps": cfg.epsilon_timesteps,
-        }
-    )
-    return config
 
 
 @hydra.main(version_base=None, config_path="config/", config_name="simpleconf.yaml")
@@ -58,12 +43,12 @@ def run(cfg: DictConfig):
                 "agent0": PolicySpec(
                     observation_space=env_creator(cfg.env).observation_space,
                     action_space=env_creator(cfg.env).action_space,
-                    config=exploration_config_builder(cfg.training.exploration),
+                    config=algo_config_builder(cfg.training),
                 ),
                 "agent1": PolicySpec(
                     observation_space=env_creator(cfg.env).observation_space,
                     action_space=env_creator(cfg.env).action_space,
-                    config=exploration_config_builder(cfg.training.exploration),
+                    config=algo_config_builder(cfg.training),
                 ),
             },
             "policy_mapping_fn": lambda agent_id, *args, **kwargs: agent_id,
