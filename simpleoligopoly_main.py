@@ -1,61 +1,21 @@
 import hydra
 import ray
-from gymnasium.spaces.box import Box
-from gymnasium.spaces.discrete import Discrete
 from omegaconf import DictConfig, OmegaConf
 from ray.air.config import RunConfig, ScalingConfig
 from ray.air.integrations.wandb import WandbLoggerCallback
-from ray.rllib.policy.policy import PolicySpec
 from ray.train.rl import RLTrainer
 from ray.tune.registry import register_env
 
 import wandb
-from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
-from loggers.action_logger import ActionLogger, SharedMetrics
-from utils.algo_helpers import algo_config_builder
-
-
-def env_creator(env_config):
-    return SimpleOligopolyEnv(seed=0, config=env_config)
+from loggers.action_logger import SharedMetrics
+from utils.algo_helpers import env_creator, experiment_config_builder
 
 
 @hydra.main(version_base=None, config_path="config/", config_name="simpleconf.yaml")
 def run(cfg: DictConfig):
-    spaces = {
-        "observation_space": Box(
-            low=-cfg.env.max_price,
-            high=cfg.env.max_price,
-            shape=(cfg.env.memory_size * cfg.env.num_sellers,),
-        ),
-        "action_space": Box(low=-cfg.env.max_price, high=cfg.env.max_price, shape=(1,))
-        if cfg.env.action_type == "cont"
-        else Discrete(cfg.env.disc_action_size),
-    }
-    config = {
-        "env": "duopoly_env",
-        "train_batch_size": 64,
-        "env_config": spaces | OmegaConf.to_container(cfg.env),
-        "num_workers": 2,
-        "framework": "torch",
-        "callbacks": ActionLogger,
-        "multiagent": {
-            "policies": {
-                "agent0": PolicySpec(
-                    observation_space=env_creator(cfg.env).observation_space,
-                    action_space=env_creator(cfg.env).action_space,
-                    config=algo_config_builder(cfg.training),
-                ),
-                "agent1": PolicySpec(
-                    observation_space=env_creator(cfg.env).observation_space,
-                    action_space=env_creator(cfg.env).action_space,
-                    config=algo_config_builder(cfg.training),
-                ),
-            },
-            "policy_mapping_fn": lambda agent_id, *args, **kwargs: agent_id,
-        },
-    }
+    config = experiment_config_builder(cfg)
     env_creator(env_config=OmegaConf.to_container(cfg.env))
-    register_env("duopoly_env", env_creator)
+    register_env(cfg.env.name, env_creator)
 
     shared_metrics_actor = SharedMetrics.remote()
 
@@ -64,11 +24,11 @@ def run(cfg: DictConfig):
         run_config=RunConfig(
             # THIS WILL BE SET FROM CONFIG
             stop={"training_iteration": 2},
-            callbacks=[WandbLoggerCallback(project="RLAC_DEBUG")],
+            callbacks=[WandbLoggerCallback(project="BRUH")],
         ),
         scaling_config=ScalingConfig(num_workers=2, use_gpu=False),
         # THIS WILL BE SET FROM CONFIG
-        algorithm="DQN",
+        algorithm=cfg.training.algo,
         config=config,
     )
     result = trainer.fit()
@@ -90,5 +50,5 @@ def run(cfg: DictConfig):
 
 if __name__ == "__main__":
     ray.init()
-    wandb.init(project="RLAC_DEBUG", group="D_DEBUG")
+    wandb.init(project="BRUH", group="D_DEBUG")
     run()
