@@ -18,6 +18,9 @@ from loggers.action_logger import ActionLogger
 
 
 def env_creator(env_config):
+    """
+    Create Environment According to environment specific configs
+    """
     match env_config.get("name", None):
         case "duopoly_env":
             return SimpleOligopolyEnv(seed=0, config=env_config)
@@ -26,6 +29,9 @@ def env_creator(env_config):
 
 
 def algo_config_builder(cfg):
+    """
+    Set Algorithm configs accordingly
+    """
     match cfg.algo:
         case "DQN":
             config = DQNConfig()
@@ -49,6 +55,9 @@ def algo_config_builder(cfg):
 
 
 def policy_builder(cfg):
+    """
+    Create a dictionary of agent_id:PolicySpec mapping
+    """
     policies = {}
     for agent_id in cfg.env.agent_ids:
         policies[agent_id] = PolicySpec(
@@ -60,6 +69,11 @@ def policy_builder(cfg):
 
 
 def experiment_config_builder(cfg):
+    """
+    Create experiment specific configs
+    """
+
+    # Observation and Action spaces made available for RLLib
     spaces = {
         "observation_space": Box(
             low=-cfg.env.max_price,
@@ -70,6 +84,8 @@ def experiment_config_builder(cfg):
         if cfg.env.action_type == "cont"
         else Discrete(cfg.env.disc_action_size),
     }
+
+    # Put every config together
     exp_config = {
         "env": cfg.env.name,
         "env_config": spaces | OmegaConf.to_container(cfg.env),

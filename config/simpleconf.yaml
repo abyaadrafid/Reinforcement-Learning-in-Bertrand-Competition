@@ -20,6 +20,7 @@ env :
 training :
   algo : 'A2C'
   bs : 128
+  iterations : 2
   exploration:
     type : 'EpsilonGreedy'
     initial_epsilon : 1.0

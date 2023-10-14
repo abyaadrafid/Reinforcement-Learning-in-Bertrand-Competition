@@ -13,21 +13,23 @@ from utils.algo_helpers import env_creator, experiment_config_builder
 
 @hydra.main(version_base=None, config_path="config/", config_name="simpleconf.yaml")
 def run(cfg: DictConfig):
+    # Generated config dictionary for the experiment
     config = experiment_config_builder(cfg)
+
+    # Environment registration for RLLib
     env_creator(env_config=OmegaConf.to_container(cfg.env))
     register_env(cfg.env.name, env_creator)
 
+    # Dummy actor to collect agent actions
     shared_metrics_actor = SharedMetrics.remote()
 
     # Set up trainer
     trainer = RLTrainer(
         run_config=RunConfig(
-            # THIS WILL BE SET FROM CONFIG
-            stop={"training_iteration": 2},
+            stop={"training_iteration": cfg.training.iterations},
             callbacks=[WandbLoggerCallback(project="BRUH")],
         ),
         scaling_config=ScalingConfig(num_workers=2, use_gpu=False),
-        # THIS WILL BE SET FROM CONFIG
         algorithm=cfg.training.algo,
         config=config,
     )
