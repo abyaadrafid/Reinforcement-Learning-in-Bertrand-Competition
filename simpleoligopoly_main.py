@@ -22,15 +22,27 @@ def env_creator(env_config):
     return SimpleOligopolyEnv(seed=0, config=env_config)
 
 
+def exploration_config_builder(cfg):
+    config = DQNConfig()
+    config.exploration_config.update(
+        {
+            "initial_epsilon": cfg.initial_epsilon,
+            "final_epsilon": cfg.final_epsilon,
+            "epsilon_timesteps": cfg.epsilon_timesteps,
+        }
+    )
+    return config
+
+
 @hydra.main(version_base=None, config_path="config/", config_name="simpleconf.yaml")
 def run(cfg: DictConfig):
     spaces = {
         "observation_space": Box(
-            low=-cfg.env.min_price,
+            low=-cfg.env.max_price,
             high=cfg.env.max_price,
             shape=(cfg.env.memory_size * cfg.env.num_sellers,),
         ),
-        "action_space": Box(low=-cfg.env.min_price, high=cfg.env.max_price, shape=(1,))
+        "action_space": Box(low=-cfg.env.max_price, high=cfg.env.max_price, shape=(1,))
         if cfg.env.action_type == "cont"
         else Discrete(cfg.env.disc_action_size),
     }
@@ -46,12 +58,12 @@ def run(cfg: DictConfig):
                 "agent0": PolicySpec(
                     observation_space=env_creator(cfg.env).observation_space,
                     action_space=env_creator(cfg.env).action_space,
-                    config=DQNConfig.overrides(framework_str="torch"),
+                    config=exploration_config_builder(cfg.training.exploration),
                 ),
                 "agent1": PolicySpec(
                     observation_space=env_creator(cfg.env).observation_space,
                     action_space=env_creator(cfg.env).action_space,
-                    config=DQNConfig.overrides(framework_str="torch"),
+                    config=exploration_config_builder(cfg.training.exploration),
                 ),
             },
             "policy_mapping_fn": lambda agent_id, *args, **kwargs: agent_id,
@@ -66,8 +78,8 @@ def run(cfg: DictConfig):
     trainer = RLTrainer(
         run_config=RunConfig(
             # THIS WILL BE SET FROM CONFIG
-            stop={"training_iteration": 200},
-            callbacks=[WandbLoggerCallback(project="RLAC_CUSTOM_METRICS")],
+            stop={"training_iteration": 2},
+            callbacks=[WandbLoggerCallback(project="RLAC_DEBUG")],
         ),
         scaling_config=ScalingConfig(num_workers=2, use_gpu=False),
         # THIS WILL BE SET FROM CONFIG
@@ -93,5 +105,5 @@ def run(cfg: DictConfig):
 
 if __name__ == "__main__":
     ray.init()
-    wandb.init(project="RLAC_CUSTOM_METRICS", group="D_DQN_SYM_500_200")
+    wandb.init(project="RLAC_DEBUG", group="D_DEBUG")
     run()
