@@ -1,3 +1,7 @@
+"""
+To be used exclusively for symmetric agents
+"""
+
 import sys
 from pathlib import Path
 
