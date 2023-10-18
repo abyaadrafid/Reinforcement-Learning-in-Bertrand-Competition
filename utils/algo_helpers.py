@@ -15,6 +15,7 @@ from ray.rllib.algorithms.a2c import A2CConfig
 from ray.rllib.algorithms.ddpg import DDPGConfig
 from ray.rllib.algorithms.dqn import DQNConfig
 from ray.rllib.algorithms.ppo import PPOConfig
+from ray.rllib.examples.policy.random_policy import RandomPolicy
 from ray.rllib.policy.policy import PolicySpec
 
 from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
@@ -32,11 +33,11 @@ def env_creator(env_config):
             raise NotImplementedError("Env not supported yet")
 
 
-def algo_config_builder(cfg):
+def algo_config_builder(cfg, index: int):
     """
     Set Algorithm configs accordingly
     """
-    match cfg.algo:
+    match cfg.algo[index]:
         case "DQN":
             config = DQNConfig()
             config.exploration_config.update(
@@ -52,6 +53,8 @@ def algo_config_builder(cfg):
             config = DDPGConfig()
         case "PPO":
             config = PPOConfig()
+        case "Random":
+            config = {}
         case _:
             raise NotImplementedError("Not a valid algorithm")
 
@@ -63,13 +66,21 @@ def policy_builder(cfg):
     Create a dictionary of agent_id:PolicySpec mapping
     """
     policies = {}
-    for agent_id in cfg.env.agent_ids:
+    for idx, agent_id in enumerate(cfg.env.agent_ids):
         policies[agent_id] = PolicySpec(
+            policy_class=RandomPolicy if cfg.training.algo[idx] == "Random" else None,
             observation_space=env_creator(cfg.env).observation_space,
             action_space=env_creator(cfg.env).action_space,
-            config=algo_config_builder(cfg.training),
+            config=algo_config_builder(cfg.training, idx),
         )
     return policies
+
+
+def get_trainable_policies(cfg):
+    return [
+        agent_id if not cfg.training.algo[idx] == "Random" else None
+        for idx, agent_id in enumerate(cfg.env.agent_ids)
+    ]
 
 
 def experiment_config_builder(cfg):
@@ -99,6 +110,7 @@ def experiment_config_builder(cfg):
         "multiagent": {
             "policies": policy_builder(cfg),
             "policy_mapping_fn": lambda agent_id, *args, **kwargs: agent_id,
+            "policies_to_train": get_trainable_policies(cfg),
         },
     }
     return exp_config
