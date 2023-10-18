@@ -57,9 +57,6 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
         # shift and replace older states
         self.states = np.roll(self.states, -self.num_sellers)
         for i, action in enumerate(actions):
-            # take discrete actions if the space is discrete
-            if self.action_type == "disc":
-                action = self.possible_actions[action]
             # update states accordingly
             self.states[self.memory_size * self.num_sellers - i - 1] = action
 
@@ -81,6 +78,8 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
     def step(self, actions: Dict):
         if actions:
             actions = self._from_RLLib_API_to_list(actions)
+            if self.action_type == "disc":
+                actions = [self.possible_actions[action] for action in actions]
             # store actions for logging
             for idx in range(self.num_sellers):
                 self.action_memory[idx][self.curstep] = actions[idx]
