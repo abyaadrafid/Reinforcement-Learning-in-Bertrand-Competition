@@ -22,7 +22,6 @@ from ray.rllib.utils.replay_buffers.multi_agent_replay_buffer import (
 )
 from ray.rllib.utils.sgd import standardized
 from ray.rllib.utils.typing import ResultDict
-from ray.tune.logger import Logger
 
 
 class AsymmetricDuopoly(Algorithm):
@@ -51,7 +50,7 @@ class AsymmetricDuopoly(Algorithm):
                 # Update sampled counters.
                 self._counters[NUM_ENV_STEPS_SAMPLED] += ma_batch.count
                 self._counters[NUM_AGENT_STEPS_SAMPLED] += ma_batch.agent_steps()
-                ppo_batch = ma_batch.policy_batches.pop("ppo_policy")
+                ppo_batch = ma_batch.policy_batches.pop("ppo")
                 # Add collected batches (only for DQN policy) to replay buffer.
                 self.local_replay_buffer.add(ma_batch)
 
@@ -63,26 +62,19 @@ class AsymmetricDuopoly(Algorithm):
         # Start updating DQN policy once we have some samples in the buffer.
         if self._counters[NUM_ENV_STEPS_SAMPLED] > 1000:
             # Update DQN policy n times while updating PPO policy once.
-            for _ in range(10):
+            for _ in range(200):
                 dqn_train_batch = self.local_replay_buffer.sample(num_items=64)
-                dqn_train_results = train_one_step(
-                    self, dqn_train_batch, ["dqn_policy"]
-                )
+                dqn_train_results = train_one_step(self, dqn_train_batch, ["dqn"])
                 self._counters[
                     "agent_steps_trained_DQN"
                 ] += dqn_train_batch.agent_steps()
-                print(
-                    "DQN policy learning on samples from",
-                    "agent steps trained",
-                    dqn_train_batch.agent_steps(),
-                )
         # Update DQN's target net every n train steps (determined by the DQN config).
         if (
             self._counters["agent_steps_trained_DQN"]
             - self._counters[LAST_TARGET_UPDATE_TS]
-            >= self.get_policy("dqn_policy").config["target_network_update_freq"]
+            >= self.get_policy("dqn").config["target_network_update_freq"]
         ):
-            self.workers.local_worker().get_policy("dqn_policy").update_target()
+            self.workers.local_worker().get_policy("dqn").update_target()
             self._counters[NUM_TARGET_UPDATES] += 1
             self._counters[LAST_TARGET_UPDATE_TS] = self._counters[
                 "agent_steps_trained_DQN"
@@ -95,15 +87,10 @@ class AsymmetricDuopoly(Algorithm):
         ppo_train_batch[Postprocessing.ADVANTAGES] = standardized(
             ppo_train_batch[Postprocessing.ADVANTAGES]
         )
-        print(
-            "PPO policy learning on samples from",
-            "agent steps trained",
-            ppo_train_batch.agent_steps(),
-        )
         ppo_train_batch = MultiAgentBatch(
-            {"ppo_policy": ppo_train_batch}, ppo_train_batch.count
+            {"ppo": ppo_train_batch}, ppo_train_batch.count
         )
-        ppo_train_results = train_one_step(self, ppo_train_batch, ["ppo_policy"])
+        ppo_train_results = train_one_step(self, ppo_train_batch, ["ppo"])
 
         # Combine results for PPO and DQN into one results dict.
         results = dict(ppo_train_results, **dqn_train_results)
