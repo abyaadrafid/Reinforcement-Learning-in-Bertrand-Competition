@@ -29,6 +29,17 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
         self.max_steps = config.get("max_steps")
         self.seller_ids = config.get("agent_ids")
 
+    def _discretize_action_space(self):
+        competitive_price = self.market.compute_competitive_prices(self.num_sellers)
+        monopoly_price = self.market.compute_monopoly_prices(self.num_sellers)
+        # Get evenly spaced actions between competitive and monopoly prices
+        # Following scheme from Calvano 2020 , setting ξ=1
+        self.possible_actions = np.linspace(
+            2 * competitive_price - monopoly_price,
+            2 * monopoly_price - competitive_price,
+            self.action_space.n,
+        )
+
     def _init_internal_vars(self):
         # n_features is the input size for the policy network
         self.n_features = self.memory_size * self.num_sellers
@@ -40,18 +51,23 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
         self.curstep = 0
 
     def _init_states(self):
-        # randomly initialize states
+        # randomly initialize states within boundaries
         # states are 1D (flattened for ease, nD possible)
-        self.states = np.random.uniform(
-            low=self.min_price,
-            high=self.max_price,
-            size=(self.memory_size * self.num_sellers),
-        )
-        self.rewards = np.zeros(shape=(self.num_sellers,))
-
-        # Discrete action support, needs to be not be hardcoded
         if self.action_type == "disc":
-            self.possible_actions = [-2, -0.1414, -0.01, 0, 0.01, 0.1414, 2]
+            self._discretize_action_space()
+            self.states = np.random.uniform(
+                low=np.min(self.possible_actions),
+                high=np.max(self.possible_actions),
+                size=(self.memory_size * self.num_sellers),
+            )
+        else:
+            self.states = np.random.uniform(
+                low=-self.max_price,
+                high=self.max_price,
+                size=(self.memory_size * self.num_sellers),
+            )
+
+        self.rewards = np.zeros(shape=(self.num_sellers,))
 
     def _create_states(self, actions: list):
         # shift and replace older states

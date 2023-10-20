@@ -121,7 +121,8 @@ def env_config_builder(cfg):
     spaces = {
         "observation_space": Box(
             low=-cfg.env.max_price,
-            high=cfg.env.max_price,
+            high=cfg.env.max_price
+            * 2,  # expanding obs space to support actions following calvano
             shape=(cfg.env.memory_size * cfg.env.num_sellers,),
         ),
         "action_space": Box(low=-cfg.env.max_price, high=cfg.env.max_price, shape=(1,))

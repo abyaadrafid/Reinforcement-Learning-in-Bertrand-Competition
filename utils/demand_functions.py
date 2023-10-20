@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.optimize import fsolve
 
 
 class SimpleMarket:
@@ -12,8 +13,34 @@ class SimpleMarket:
                 self.demand_func = LogitDemand(config=config.get("logit"))
             case "Linear":
                 self.demand_func = LinearDemand(config=config.get("linear"))
-            case default:
+            case _:
                 raise NotImplementedError("Use a defined demand type")
+
+    def _foc(self, prices):
+        """Compute first order condition"""
+        d = self.demand_func.demand(prices)
+        zero = 1 - (prices - self.demand_func.cost) * (1 - d) / self.demand_func.mu
+        return np.squeeze(zero)
+
+    def _foc_monoply(self, prices):
+        """Compute first order condition of a monopolist"""
+        d = self.demand_func.demand(prices)
+        d1 = np.flip(d)
+        p1 = np.flip(prices)
+        zero = (
+            1
+            - (prices - self.demand_func.cost) * (1 - d) / self.demand_func.mu
+            + (p1 - self.demand_func.cost) * d1 / self.demand_func.mu
+        )
+        return np.squeeze(zero)
+
+    def compute_competitive_prices(self, num_sellers: int):
+        p0 = np.ones((1, num_sellers)) * 1 * self.demand_func.cost
+        return fsolve(self._foc, p0)[0]
+
+    def compute_monopoly_prices(self, num_sellers: int):
+        p0 = np.ones((1, num_sellers)) * 1 * self.demand_func.cost
+        return fsolve(self._foc_monoply, p0)[0]
 
     def compute_profit(self, prices):
         """
