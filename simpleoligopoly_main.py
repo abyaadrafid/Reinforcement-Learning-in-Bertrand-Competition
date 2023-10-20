@@ -1,6 +1,7 @@
 import hydra
 import ray
 from omegaconf import DictConfig, OmegaConf
+from ray import tune
 from ray.air.config import RunConfig, ScalingConfig
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.train.rl import RLTrainer
@@ -23,17 +24,17 @@ def run(cfg: DictConfig):
     # Dummy actor to collect agent actions
     shared_metrics_actor = SharedMetrics.remote()
 
-    # Set up trainer
-    trainer = RLTrainer(
+    # Training loop
+    tune.Tuner(
+        # Assuming both agents use the same training mechanism
+        # Setting trainable from config as a string
+        trainable=cfg.training.algo[0],  # "DQN" or "PPO" or whatever
+        param_space=config,
         run_config=RunConfig(
             stop={"training_iteration": cfg.training.iterations},
             callbacks=[WandbLoggerCallback(project="BRUH")],
         ),
-        scaling_config=ScalingConfig(num_workers=2, use_gpu=False),
-        algorithm=cfg.training.algo,
-        config=config,
-    )
-    result = trainer.fit()
+    ).fit()
 
     # MOVE THE COLLECTION AND LOGGING TO CORRESPONDING MODULE
     # Collect data from custom callbacks
