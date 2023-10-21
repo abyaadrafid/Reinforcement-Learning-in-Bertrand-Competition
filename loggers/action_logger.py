@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 
 import ray
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
@@ -16,31 +16,32 @@ import wandb
 @ray.remote(name="shared_metrics")
 class SharedMetrics:
     def __init__(self):
-        self.metrics = []
+        self.all_prices = []
 
-    def append(self, metric_data):
-        self.metrics.append(metric_data)
+    def append_price(self, metric_data):
+        self.all_prices.append(metric_data)
 
     def get_result(self):
-        return self.metrics
+        return self.all_prices
 
 
 class ActionLogger(DefaultCallbacks):
-    def on_episode_end(
+    def on_episode_step(
         self,
         *,
         worker: RolloutWorker,
         base_env: BaseEnv,
-        policies: Dict[PolicyID, Policy],
-        episode: Episode | EpisodeV2 | Exception,
+        policies: Dict[PolicyID, Policy] | None = None,
+        episode: Episode | EpisodeV2,
         env_index: int | None = None,
         **kwargs
     ) -> None:
         shared_metrics_actor = ray.get_actor("shared_metrics")
         envs = base_env.get_sub_environments()
-        mean_prices = envs[env_index].get_mean_prices()
-        shared_metrics_actor.append.remote({"ep_mean_price": mean_prices})
-        return super().on_episode_end(
+        last_prices = envs[env_index].get_last_prices()
+        shared_metrics_actor.append_price.remote({"step_last_price": last_prices})
+
+        return super().on_episode_step(
             worker=worker,
             base_env=base_env,
             policies=policies,

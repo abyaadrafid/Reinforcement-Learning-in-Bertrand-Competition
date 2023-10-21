@@ -46,7 +46,7 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
         # for rllib compatibility
         self._agent_ids = self.seller_ids
         # storing actions for the whole episode
-        self.action_memory = np.zeros(shape=(self.num_sellers, self.max_steps))
+        self.action_memory = np.zeros(shape=(self.num_sellers, 1))
         # termination condition
         self.curstep = 0
 
@@ -96,9 +96,6 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
             actions = self._from_RLLib_API_to_list(actions)
             if self.action_type == "disc":
                 actions = [self.possible_actions[action] for action in actions]
-            # store actions for logging
-            for idx in range(self.num_sellers):
-                self.action_memory[idx][self.curstep] = actions[idx]
 
             # generate new states based on actions
             self._create_states(actions)
@@ -109,9 +106,9 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
         return self._build_dictionary()
         # next_state, rewards, dones, truncated, infos
 
-    def get_mean_prices(self):
+    def get_last_prices(self):
         # for logging
-        return np.mean(self.action_memory, axis=1)
+        return self.states[-self.num_sellers :]
 
     def _from_RLLib_API_to_list(self, actions):
         """

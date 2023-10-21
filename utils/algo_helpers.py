@@ -133,23 +133,35 @@ def env_config_builder(cfg):
     return spaces | OmegaConf.to_container(cfg.env)
 
 
-def experiment_config_builder(cfg):
+def experiment_config_builder(cfg, sym: bool = True):
     """
     Create experiment specific configs
     """
-
+    if sym:
+        exp_config = {
+            "env": cfg.env.name,
+            "env_config": env_config_builder(cfg),
+            "framework": "torch",
+            "train_batch_size": cfg.training.bs,
+            "callbacks": ActionLogger,
+            "multiagent": {
+                "policies": policy_builder(cfg),
+                "policy_mapping_fn": lambda agent_id, *args, **kwargs: agent_id,
+            },
+        }
     # Put every config together
-    exp_config = (
-        AlgorithmConfig()
-        .environment(env=cfg.env.name, env_config=env_config_builder(cfg))
-        .framework("torch")
-        .callbacks(ActionLogger)
-        .multi_agent(
-            policies=policy_builder(cfg),
-            policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id,
-            policies_to_train=get_trainable_policies(cfg),
-        )
-        .training(_enable_learner_api=False)
-        .rl_module(_enable_rl_module_api=False)
-    ).to_dict()
+    else:
+        exp_config = (
+            AlgorithmConfig()
+            .environment(env=cfg.env.name, env_config=env_config_builder(cfg))
+            .framework("torch")
+            .callbacks(ActionLogger)
+            .multi_agent(
+                policies=policy_builder(cfg),
+                policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id,
+                policies_to_train=get_trainable_policies(cfg),
+            )
+            .training(_enable_learner_api=False)
+            .rl_module(_enable_rl_module_api=False)
+        ).to_dict()
     return exp_config
