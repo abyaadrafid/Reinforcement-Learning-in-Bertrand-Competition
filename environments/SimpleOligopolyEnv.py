@@ -33,10 +33,10 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
         competitive_price = self.market.compute_competitive_prices(self.num_sellers)
         monopoly_price = self.market.compute_monopoly_prices(self.num_sellers)
         # Get evenly spaced actions between competitive and monopoly prices
-        # Following scheme from Calvano 2020 , setting ξ=1
+        # Following scheme from Calvano 2020 , setting ξ=0.1
         self.possible_actions = np.linspace(
-            2 * competitive_price - monopoly_price,
-            2 * monopoly_price - competitive_price,
+            competitive_price - 0.1 * (monopoly_price - competitive_price),
+            monopoly_price + 0.1 * (monopoly_price - competitive_price),
             self.action_space.n,
         )
 
