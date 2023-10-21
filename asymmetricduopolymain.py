@@ -36,13 +36,20 @@ def run(cfg: DictConfig):
 
     # MOVE THE COLLECTION AND LOGGING TO CORRESPONDING MODULE
     # Collect data from custom callbacks
-    shared_metrics = ray.get(shared_metrics_actor.get_result.remote())
-
+    all_prices, mean_prices = ray.get(shared_metrics_actor.get_result.remote())
+    price_table = wandb.Table(
+        columns=[f"mean_price_{agent_id}" for agent_id in cfg.env.agent_ids]
+    )
+    for ep_metric in mean_prices:
+        price_table.add_data(*ep_metric.get("ep_mean_price"))
     # Iterate through the list of custom metrics and send to wandb
-    for ep_metric in shared_metrics:
-        prices = ep_metric.get("step_last_price")
+    for step_metric in all_prices:
+        prices = step_metric.get("step_last_price")
+
         for idx, agent_id in enumerate(cfg.env.agent_ids):
             wandb.log({f"{agent_id}_prices": prices[idx]})
+    # Send it to wandb
+    wandb.log({"Price Table": price_table})
 
 
 if __name__ == "__main__":
