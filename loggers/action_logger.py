@@ -14,9 +14,10 @@ from ray.rllib.utils.typing import PolicyID
 # Create a Ray actor to store shared metrics data
 @ray.remote(name="shared_metrics")
 class SharedMetrics:
-    def __init__(self):
+    def __init__(self, steps: int):
         self.all_prices = []
         self.mean_prices = []
+        self.steps = steps
 
     def append_price(self, metric_data):
         self.all_prices.append(metric_data)
@@ -27,7 +28,7 @@ class SharedMetrics:
                 "ep_mean_price": np.mean(
                     [
                         step_prices["step_last_price"]
-                        for step_prices in self.all_prices[-500:]
+                        for step_prices in self.all_prices[-self.steps :]
                     ],
                     axis=0,
                 )
