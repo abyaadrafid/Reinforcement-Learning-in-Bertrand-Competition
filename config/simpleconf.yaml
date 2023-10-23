@@ -5,9 +5,9 @@ env :
   num_sellers : 2
   num_customers : 30
   memory_size : 5
-  action_type : "disc"
+  action_type : "cont"
   disc_action_size : 6
-  max_steps : 500
+  max_steps : 50
   agent_ids : ["agent0", "agent1"]
   market : 
     demand_type : "Logit"
@@ -18,7 +18,7 @@ env :
       a : 2
     linear :
 training :
-  algo : ["DQN", "DQN"]
+  algo : ["PPO", "PPO"]
   bs : 64
   iterations : 2
   exploration:

@@ -2,7 +2,7 @@
 To be used exclusively for asymmetric agents
 For now support limited to discrete actions
 """
-from typing import Callable
+from typing import Callable, Optional
 
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.algorithms.algorithm_config import AlgorithmConfig
@@ -22,9 +22,19 @@ from ray.rllib.utils.replay_buffers.multi_agent_replay_buffer import (
 )
 from ray.rllib.utils.sgd import standardized
 from ray.rllib.utils.typing import ResultDict
+from ray.tune.logger import Logger
 
 
 class AsymmetricDuopoly(Algorithm):
+    def __init__(
+        self,
+        config: AlgorithmConfig | None = None,
+        env=None,
+        logger_creator: Callable[[], Logger] | None = None,
+        **kwargs
+    ):
+        super().__init__(config, env, logger_creator, **kwargs)
+
     @override(Algorithm)
     def setup(self, config):
         # Call super's `setup` to create rollout workers.

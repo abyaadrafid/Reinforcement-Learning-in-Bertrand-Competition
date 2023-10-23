@@ -4,6 +4,8 @@ from omegaconf import DictConfig, OmegaConf
 from ray import tune
 from ray.air.config import RunConfig
 from ray.air.integrations.wandb import WandbLoggerCallback
+from ray.rllib.algorithms.dqn.dqn import DQN
+from ray.rllib.algorithms.ppo.ppo import PPO
 from ray.tune.registry import register_env
 
 import wandb
@@ -24,10 +26,11 @@ def run(cfg: DictConfig):
     shared_metrics_actor = SharedMetrics.remote()
 
     # Training loop
+    # trainable_with_cpu_gpu = tune.with_resources(PPO, {"cpu": 2})
     tune.Tuner(
         # Assuming both agents use the same training mechanism
         # Setting trainable from config as a string
-        trainable=cfg.training.algo[0],  # "DQN" or "PPO" or whatever
+        "PPO",  # "DQN" or "PPO" or whatever
         param_space=config,
         run_config=RunConfig(
             stop={"training_iteration": cfg.training.iterations},
