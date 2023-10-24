@@ -20,7 +20,7 @@ env :
 training :
   algo : ['DQN', 'PPO']
   bs : 64
-  iterations : 2
+  iterations : 20
   exploration:
     type : 'EpsilonGreedy'
     initial_epsilon : 1.0

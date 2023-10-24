@@ -15,7 +15,7 @@ from utils.custom_trainers import AsymmetricDuopoly
 @hydra.main(version_base=None, config_path="config/", config_name="asymmconf.yaml")
 def run(cfg: DictConfig):
     # Generated config dictionary for the experiment
-    config = experiment_config_builder(cfg)
+    config = experiment_config_builder(cfg, sym=False)
 
     # Environment registration for RLLib
     env_creator(env_config=OmegaConf.to_container(cfg.env))
