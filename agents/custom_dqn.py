@@ -14,22 +14,28 @@ class CustomDQN:
     def __init__(self, algo_id, config):
         self.id = algo_id
         self.config = config
+        # Local replay buffer
         self.replay_buffer = ReplayBuffer(capacity=self.config["replay_buffer_size"])
 
     def train(self, algorithm_instance):
         result = {}
+        # check for minimum number of samples before training
         if self.replay_buffer.__len__() >= self.config["min_replay_samples"]:
+            # update DQN policy n times per training step
             for _ in range(self.config["policy_update_per_training_step"]):
+                # sample and train
                 train_batches = self.replay_buffer.sample(
                     num_items=self.config["dqn_batch_size"]
                 )
                 result = train_one_step(algorithm_instance, train_batches, [self.id])
+                # update counters
                 algorithm_instance._counters[
                     f"agent_steps_trained_{self.id}"
                 ] += train_batches.agent_steps()
         return result
 
     def postprocess(self, algorithm_instance):
+        # update target network accoding to the counters
         if (
             algorithm_instance._counters[f"agent_steps_trained_{self.id}"]
             - algorithm_instance._counters[LAST_TARGET_UPDATE_TS]
@@ -46,4 +52,5 @@ class CustomDQN:
             ] = algorithm_instance._counters[f"agent_steps_trained_{self.id}"]
 
     def process_batch(self, batch):
+        # Add samples to the replay buffer
         self.replay_buffer.add(batch.policy_batches.pop(self.id))
