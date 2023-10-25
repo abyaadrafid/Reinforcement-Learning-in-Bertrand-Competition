@@ -16,15 +16,15 @@ class CustomDQN:
         self.config = config
         self.replay_buffer = ReplayBuffer(capacity=self.config["replay_buffer_size"])
 
-    def train(self, algorithm):
+    def train(self, algorithm_instance):
         result = {}
         if self.replay_buffer.__len__() >= self.config["min_replay_samples"]:
             for _ in range(self.config["policy_update_per_training_step"]):
                 train_batches = self.replay_buffer.sample(
                     num_items=self.config["dqn_batch_size"]
                 )
-                result = train_one_step(algorithm, train_batches, [self.id])
-                algorithm._counters[
+                result = train_one_step(algorithm_instance, train_batches, [self.id])
+                algorithm_instance._counters[
                     f"agent_steps_trained_{self.id}"
                 ] += train_batches.agent_steps()
         return result

@@ -13,14 +13,17 @@ class CustomPPO:
     def process_batch(self, batch):
         self.batch.append(batch.policy_batches.pop(self.id))
 
-    def train(self, algorithm):
+    def train(self, algorithm_instance):
         train_batch = concat_samples(self.batch)
+        algorithm_instance._counters[
+            f"agent_steps_trained_{self.id}"
+        ] += train_batch.agent_steps()
         # Standardize advantages.
         train_batch[Postprocessing.ADVANTAGES] = standardized(
             train_batch[Postprocessing.ADVANTAGES]
         )
         train_batch = MultiAgentBatch({self.id: train_batch}, train_batch.count)
-        result = train_one_step(algorithm, train_batch, [self.id])
+        result = train_one_step(algorithm_instance, train_batch, [self.id])
         return result
 
     def postprocess(self, algorithm):

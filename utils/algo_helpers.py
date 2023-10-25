@@ -62,7 +62,7 @@ def algo_config_builder(cfg, index: int):
         case "PPO":
             config = PPOConfig()
         case "Random":
-            config = {}
+            return {}
         case _:
             print(cfg.algo[index])
             raise NotImplementedError("Algorithm not supported yet")
@@ -110,8 +110,9 @@ def get_trainable_policies(cfg):
     Fixed/Random policies dont get updated
     """
     return [
-        agent_id if not cfg.training.algo[idx] == "Random" else None
+        agent_id
         for idx, agent_id in enumerate(cfg.env.agent_ids)
+        if not cfg.training.algo[idx] == "Random"
     ]
 
 
@@ -167,10 +168,10 @@ def experiment_config_builder(cfg, sym: bool = True):
 
         # NEW CONFIGS NEED TO BE SET FROM HYDRA
         exp_config["algo_classes"] = cfg.training.algo
-        exp_config["env_steps_per_training_step"] = 1000
+        exp_config["env_steps_per_training_step"] = 500
         exp_config["agent_ids"] = cfg.env.agent_ids
         exp_config["replay_buffer_size"] = 50000
         exp_config["min_replay_samples"] = 1000
-        exp_config["policy_update_per_training_step"] = 500
-        exp_config["dqn_batch_size"] = 2
+        exp_config["policy_update_per_training_step"] = 10
+        exp_config["dqn_batch_size"] = 64
     return exp_config

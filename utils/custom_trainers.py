@@ -21,6 +21,7 @@ from ray.tune.logger import Logger
 
 from agents.custom_dqn import CustomDQN
 from agents.custom_ppo import CustomPPO
+from agents.random_agent import RandomAgent
 
 
 class AsymmetricDuopoly(Algorithm):
@@ -49,6 +50,8 @@ class AsymmetricDuopoly(Algorithm):
                 return CustomDQN(algo_id, self.config)
             case "PPO":
                 return CustomPPO(algo_id, self.config)
+            case "Random":
+                return RandomAgent(algo_id)
 
     @override(Algorithm)
     def setup(self, config):

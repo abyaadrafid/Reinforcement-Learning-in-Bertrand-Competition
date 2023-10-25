@@ -1,26 +1,21 @@
-import random
-
-import gymnasium.spaces.box as box
-import pandas as pd
+from ray.rllib.execution.train_ops import train_one_step
+from ray.rllib.policy.sample_batch import SampleBatch
 
 
 class RandomAgent:
     """
-    Random Agent for stock trading env
-    output range : [-10000, 10000]
+    Random Agent compatible with RLLib RandomPolicy
     """
 
-    def __init__(self, action_space: box.Box):
-        self.low = -10000
-        self.high = 10000
-        # Move high and low to config or read from somewhere else
+    def __init__(self, id: str) -> None:
+        self.id = id
 
-        self.action_space = action_space.shape[0]
+    def process_batch(self, batch):
+        pass
 
-    def set_seed(self, seed: int):
-        self.seed = seed
+    def train(self, algorithm_instance):
+        result = train_one_step(algorithm_instance, SampleBatch(), [self.id])
+        return result
 
-    def get_actions(self):
-        return pd.DataFrame(
-            [random.randint(self.low, self.high) for i in range(self.action_space)]
-        )
+    def postprocess(self, algorithm):
+        pass

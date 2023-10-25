@@ -5,9 +5,9 @@ env :
   num_sellers : 2
   num_customers : 30
   memory_size : 5
-  action_type : "cont"
+  action_type : "disc"
   disc_action_size : 6
-  max_steps : 50
+  max_steps : 500
   agent_ids : ["agent0", "agent1"]
   market : 
     demand_type : "Logit"
@@ -25,4 +25,4 @@ training :
     type : 'EpsilonGreedy'
     initial_epsilon : 1.0
     final_epsilon : 0.02
-    epsilon_timesteps : 100000
+    epsilon_timesteps : 10000

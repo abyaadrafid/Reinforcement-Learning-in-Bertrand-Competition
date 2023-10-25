@@ -7,8 +7,8 @@ env :
   memory_size : 5
   action_type : "disc"
   disc_action_size : 6
-  max_steps : 500
-  agent_ids : ["dqn", "ppo"]
+  max_steps : 100
+  agent_ids : ["dqn", "rand"]
   market : 
     demand_type : "Logit"
     logit : 
@@ -18,9 +18,9 @@ env :
       a : 2
     linear :
 training :
-  algo : ['DQN', 'PPO']
+  algo : ['DQN', 'Random']
   bs : 64
-  iterations : 20
+  iterations : 400
   exploration:
     type : 'EpsilonGreedy'
     initial_epsilon : 1.0

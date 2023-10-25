@@ -30,7 +30,7 @@ def run(cfg: DictConfig):
         param_space=config,
         run_config=RunConfig(
             stop={"training_iteration": cfg.training.iterations},
-            callbacks=[WandbLoggerCallback(project="BRUH")],
+            callbacks=[WandbLoggerCallback(project="ASYM_DUOPOLY")],
         ),
     ).fit()
 
@@ -54,5 +54,5 @@ def run(cfg: DictConfig):
 
 if __name__ == "__main__":
     ray.init()
-    wandb.init(project="BRUH", group="D_DEBUG")
+    wandb.init(project="ASYM_DUOPOLY", group="D_DEBUG")
     run()
