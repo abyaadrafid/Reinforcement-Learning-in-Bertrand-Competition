@@ -23,7 +23,7 @@ def run(cfg: DictConfig):
     register_env(cfg.env.name, env_creator)
 
     # Dummy actor to collect agent actions
-    shared_metrics_actor = SharedMetrics.remote()
+    shared_metrics_actor = SharedMetrics.remote(cfg.env.max_steps)
 
     # Training loop
     # trainable_with_cpu_gpu = tune.with_resources(PPO, {"cpu": 2})
