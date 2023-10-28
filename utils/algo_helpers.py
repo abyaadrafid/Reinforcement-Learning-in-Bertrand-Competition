@@ -56,7 +56,7 @@ def algo_config_builder(cfg, index: int):
         case "PPO":
             config = PPOConfig()
         case "Random":
-            return {}
+            return {"explore": False}
         case _:
             print(cfg.algo[index])
             raise NotImplementedError("Algorithm not supported yet")
