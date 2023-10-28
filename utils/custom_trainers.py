@@ -42,6 +42,7 @@ class AsymmetricDuopoly(Algorithm):
         self.algos = [
             self._make_custom_algo(algo, config["agent_ids"][idx])
             for idx, algo in enumerate(config["algo_classes"])
+            if not algo == "Random"
         ]
         self.env_steps_per_training_step = config["env_steps_per_training_step"]
         self.agent_ids = config["agent_ids"]

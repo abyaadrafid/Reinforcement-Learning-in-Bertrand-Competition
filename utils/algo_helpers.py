@@ -46,13 +46,6 @@ def algo_config_builder(cfg, index: int):
     match cfg.algo[index]:
         case "DQN":
             config = DQNConfig()
-            config.exploration_config.update(
-                {
-                    "initial_epsilon": cfg.exploration.initial_epsilon,
-                    "final_epsilon": cfg.exploration.final_epsilon,
-                    "epsilon_timesteps": cfg.exploration.epsilon_timesteps,
-                }
-            )
         case "A2C":
             config = A2CConfig()
         case "A3C":
@@ -67,6 +60,14 @@ def algo_config_builder(cfg, index: int):
             print(cfg.algo[index])
             raise NotImplementedError("Algorithm not supported yet")
 
+    config.exploration_config.update(
+        {
+            "type": cfg.exploration.type,
+            "initial_epsilon": cfg.exploration.initial_epsilon,
+            "final_epsilon": cfg.exploration.final_epsilon,
+            "epsilon_timesteps": cfg.exploration.epsilon_timesteps,
+        }
+    )
     return config.training(_enable_learner_api=False).rl_module(
         _enable_rl_module_api=False
     )
@@ -172,6 +173,6 @@ def experiment_config_builder(cfg, sym: bool = True):
         exp_config["agent_ids"] = cfg.env.agent_ids
         exp_config["replay_buffer_size"] = 50000
         exp_config["min_replay_samples"] = 1000
-        exp_config["policy_update_per_training_step"] = 10
+        exp_config["policy_update_per_training_step"] = 100
         exp_config["dqn_batch_size"] = 64
     return exp_config
