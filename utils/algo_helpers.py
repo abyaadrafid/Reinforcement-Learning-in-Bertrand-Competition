@@ -23,6 +23,7 @@ from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.algorithms.ppo.ppo_torch_policy import PPOTorchPolicy
 from ray.rllib.examples.policy.random_policy import RandomPolicy
 from ray.rllib.policy.policy import PolicySpec
+from ray.rllib.utils.schedules.exponential_schedule import ExponentialSchedule
 
 from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
 from loggers.action_logger import ActionLogger
@@ -66,6 +67,9 @@ def algo_config_builder(cfg, index: int):
             "initial_epsilon": cfg.exploration.initial_epsilon,
             "final_epsilon": cfg.exploration.final_epsilon,
             "epsilon_timesteps": cfg.exploration.epsilon_timesteps,
+            "epsilon_schedule": ExponentialSchedule(
+                schedule_timesteps=cfg.exploration.epsilon_timesteps
+            ),
         }
     )
     return config.training(_enable_learner_api=False).rl_module(
