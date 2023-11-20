@@ -112,7 +112,7 @@ class ReplayMemory:
 
 
 class DQN:
-    def __init__(self, id, state_size, fc1_size, fc2_size, action_size, seed=0):
+    def __init__(self, id, state_size, fc1_size, fc2_size, action_size, type, seed=0):
         self.id = id
         self.state_size = state_size
         self.action_size = action_size
@@ -128,6 +128,10 @@ class DQN:
 
         self.memory = ReplayMemory(BUFFER_SIZE, BATCH_SIZE, seed)
         self.timestep = 0
+        self.type = type
+        if self.type == "avg_reward":
+            self.avg_rewards = torch.randn(size=(BATCH_SIZE, 1), requires_grad=True)
+            self.reward_optim = optim.Adam([self.avg_rewards])
 
     def step(self, state, action, reward, next_state, done):
         self.memory.add_experience(state, action, reward, next_state, done)
@@ -144,12 +148,22 @@ class DQN:
 
         action_values = self.target_network(next_states).detach()
         max_action_values = action_values.max(1)[0].unsqueeze(1)
-        Q_target = rewards + GAMMA * max_action_values * (1 - dones)
+
+        # update for discounted setting
+        if self.type == "disc_reward":
+            Q_target = rewards + GAMMA * max_action_values * (1 - dones)
+        # update for average setting
+        else:
+            Q_target = rewards - self.avg_rewards + max_action_values
 
         loss = F.mse_loss(Q_output, Q_target)
 
+        if self.type == "avg_reward":
+            self.reward_optim.zero_grad()
         self.optimizer.zero_grad()
         loss.backward()
+        if self.type == "avg_reward":
+            self.reward_optim.step()
         self.optimizer.step()
 
         self._update_target_network(self.q_network, self.target_network)

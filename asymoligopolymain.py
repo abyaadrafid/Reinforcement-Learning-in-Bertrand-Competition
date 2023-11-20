@@ -12,11 +12,11 @@ from agents.simple_dqn import DQN
 from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
 
 EPS_START = 1.0
-EPS_DECAY = 0.9999
+EPS_DECAY = 0.99999
 EPS_MIN = 0.01
-FC1_SIZE = 2
-FC2_SIZE = 2
-MAX_EPISODES = 1000
+FC1_SIZE = 16
+FC2_SIZE = 32
+MAX_EPISODES = 10000
 MAX_STEPS = 500
 
 
@@ -25,7 +25,7 @@ def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
         case "A2C":
             return A2C(id, obs_space, fc1, fc2, action_space)
         case "DQN":
-            return DQN(id, obs_space, fc1, fc2, action_space, seed=seed)
+            return DQN(id, obs_space, fc1, fc2, action_space, "avg_reward", seed=seed)
 
 
 @hydra.main(version_base=None, config_path="config/", config_name="asymmconf.yaml")
@@ -104,5 +104,5 @@ def run(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    wandb.init(project="debug", group="mem1", name="DQN_DUO")
+    wandb.init(project="bruh", group="mem1", name="DQN_DUO_5M_6act")
     run()
