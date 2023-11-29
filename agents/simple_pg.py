@@ -4,28 +4,23 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 
-GAMMA = 0.95
+GAMMA = 0.99
+LR = 1e-3
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
-class PolicyGradientAgent:
-    def __init__(
-        self,
-        lr,
-        state_size,
-        action_size,
-        fc1_size=128,
-        fc2_size=256,
-    ):
+class PG:
+    def __init__(self, id, state_size, fc1_size, fc2_size, action_size):
+        self.id = id
         self.policy_network = PolicyNetwork(
             state_size, fc1_size, fc2_size, action_size
         ).to(device)
-        self.optimizer = optim.Adam(self.policy_network.parameters(), lr)
+        self.optimizer = optim.Adam(self.policy_network.parameters(), LR)
         self.action_memory = []
         self.reward_memory = []
 
-    def act(self, state):
+    def act(self, state, eps=0.0):
+
         action_probs = self.policy_network(state)
         action = action_probs.sample()
         log_probs = action_probs.log_prob(action)
@@ -35,6 +30,11 @@ class PolicyGradientAgent:
 
     def store_rewards(self, reward):
         self.reward_memory.append(reward)
+
+    def step(self, state, action, reward, next_state, done):
+        self.store_rewards(reward)
+        if done:
+            self.learn()
 
     def learn(self):
         self.optimizer.zero_grad()
@@ -74,10 +74,11 @@ class PolicyNetwork(nn.Module):
             nn.Linear(fc1_size, fc2_size),
             nn.ReLU(),
             nn.Linear(fc2_size, action_size),
-            nn.Softmax(dim=1),
+            nn.Softmax(dim=0),
         )
 
     def forward(self, state):
+        state = torch.Tensor(state).to(device)
         x = self.layers(state)
         dist = Categorical(x)
 
