@@ -14,12 +14,12 @@ import torch.optim as optim
 
 TAU = 1e-3
 LR = 1e-5
-GAMMA = 0.95
+GAMMA = 0.99
 UPDATE_EVERY = 4
-BUFFER_SIZE = int(1e5)
+BUFFER_SIZE = int(1e6)
 BATCH_SIZE = 64
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ReplayMemory:
@@ -130,7 +130,9 @@ class DQN:
         self.timestep = 0
         self.type = type
         if self.type == "avg_reward":
-            self.avg_rewards = torch.randn(size=(BATCH_SIZE, 1), requires_grad=True)
+            self.avg_rewards = torch.randn(
+                size=(BATCH_SIZE, 1), requires_grad=True, device="cuda"
+            )
             self.reward_optim = optim.Adam([self.avg_rewards])
 
     def step(self, state, action, reward, next_state, done):
