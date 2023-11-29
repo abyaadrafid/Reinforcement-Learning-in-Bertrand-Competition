@@ -14,7 +14,7 @@ GAMMA = 0.99
 UPDATE_EVERY = 4
 BUFFER_SIZE = int(1e5)
 BATCH_SIZE = 64
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ReplayMemory:
@@ -190,16 +190,18 @@ class DDPG:
         self.action_size = action_size
         self.seed = random.seed(seed)
         self.memory = ReplayMemory(BUFFER_SIZE, BATCH_SIZE, seed)
-        self.actor = ActorNetwork(ACTOR_LR, state_size, fc1_size, fc2_size, action_size)
+        self.actor = ActorNetwork(
+            ACTOR_LR, state_size, fc1_size, fc2_size, action_size
+        ).to(device)
         self.target_actor = ActorNetwork(
             ACTOR_LR, state_size, fc1_size, fc2_size, action_size
-        )
+        ).to(device)
         self.critic = CriticNetwork(
             CRITIC_LR, state_size, fc1_size, fc2_size, action_size
-        )
+        ).to(device)
         self.target_critic = CriticNetwork(
             CRITIC_LR, state_size, fc1_size, fc2_size, action_size
-        )
+        ).to(device)
 
         self.timestep = 0
         self._update_target_network(self.actor, self.target_actor, tau=1)
