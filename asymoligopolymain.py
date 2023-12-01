@@ -1,23 +1,31 @@
 import random
-from collections import deque
 
 import hydra
 import numpy as np
+import torch.multiprocessing as mp
 from gymnasium.spaces import Box, Discrete
 from omegaconf import DictConfig
 
+try:
+    mp.set_start_method("spawn")
+except RuntimeError:
+    pass
+
 import wandb
 from agents.simple_a2c import A2C
+from agents.simple_ddpg import DDPG
 from agents.simple_dqn import DQN
+from agents.simple_pg import PG
 from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
 
 EPS_START = 1.0
-EPS_DECAY = 0.99999
+EPS_DECAY = 0.9999
 EPS_MIN = 0.01
 FC1_SIZE = 16
 FC2_SIZE = 32
-MAX_EPISODES = 10000
-MAX_STEPS = 500
+MAX_EPISODES = 10
+MAX_STEPS = 50000
+PROCESSES = 5
 
 
 def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
@@ -26,10 +34,30 @@ def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
             return A2C(id, obs_space, fc1, fc2, action_space)
         case "DQN":
             return DQN(id, obs_space, fc1, fc2, action_space, "avg_reward", seed=seed)
+        case "PG":
+            return PG(id, obs_space, fc1, fc2, action_space)
+        case "DDPG":
+            return DDPG(id, obs_space, fc1, fc2, action_space)
 
 
 @hydra.main(version_base=None, config_path="config/", config_name="asymmconf.yaml")
-def run(cfg: DictConfig):
+def train(cfg: DictConfig):
+    processes = []
+    for process_num in range(PROCESSES):
+        p = mp.Process(
+            target=run, args=(cfg, process_num), name=f"Process_{process_num}"
+        )
+        p.start()
+        processes.append(p)
+
+    for process in processes:
+        process.join()
+
+
+def run(cfg: DictConfig, process_name):
+    wandb.init(
+        project="deb", group="avg", name="DQN_avg_DUO_5M_6act" + str(process_name)
+    )
     # init env
     env = SimpleOligopolyEnv(seed=random.randint(0, 255), config=cfg.env)
     env.action_space = (
@@ -104,5 +132,4 @@ def run(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    wandb.init(project="bruh", group="mem1", name="DQN_DUO_5M_6act")
-    run()
+    train()
