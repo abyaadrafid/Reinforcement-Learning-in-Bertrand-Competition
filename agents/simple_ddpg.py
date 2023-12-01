@@ -106,102 +106,110 @@ class ReplayMemory:
         return len(self.memory)
 
 
+class OUNoise(object):
+    def __init__(
+        self,
+        action_space,
+        mu=0.0,
+        theta=0.15,
+        max_sigma=0.3,
+        min_sigma=0.3,
+        decay_period=100000,
+    ):
+        self.mu = mu
+        self.theta = theta
+        self.sigma = max_sigma
+        self.max_sigma = max_sigma
+        self.min_sigma = min_sigma
+        self.decay_period = decay_period
+        self.action_dim = action_space.shape[0]
+        self.low = action_space.low
+        self.high = action_space.high
+        self.reset()
+
+    def reset(self):
+        self.state = np.ones(self.action_dim) * self.mu
+
+    def evolve_state(self):
+        x = self.state
+        dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(self.action_dim)
+        self.state = x + dx
+        return self.state
+
+    def get_action(self, action, t=0):
+        ou_state = self.evolve_state()
+        self.sigma = self.max_sigma - (self.max_sigma - self.min_sigma) * min(
+            1.0, t / self.decay_period
+        )
+        return np.clip(action.cpu() + ou_state, self.low, self.high)
+
+
 class CriticNetwork(nn.Module):
-    def __init__(self, beta, state_size, fc1_dims, fc2_dims, action_size) -> None:
+    def __init__(self, beta, state_size, fc1_dims, fc2_dims, action_size, init_w=3e-3):
         super(CriticNetwork, self).__init__()
-        self.state_size = state_size
-        self.fc1_dims = fc1_dims
-        self.fc2_dims = fc2_dims
-        self.action_size = action_size
+
         self.layers = nn.Sequential(
-            nn.Linear(state_size, fc1_dims),
-            nn.LayerNorm(fc1_dims),
+            nn.Linear(state_size + action_size, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
-            nn.LayerNorm(fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, 1),
         )
-        self.action_value = nn.Linear(action_size, fc2_dims)
-        self.q_value = nn.Linear(self.fc2_dims, 1)
-        self._init_weights()
+        self.layers[4].weight.data.uniform_(-init_w, init_w)
+        self.layers[4].bias.data.uniform_(-init_w, init_w)
         self.optimizer = optim.Adam(self.parameters(), lr=beta)
 
-    def _init_weights(self):
-        f1 = 1 / np.sqrt(self.layers[0].weight.data.size()[0])
-        f2 = 1 / np.sqrt(self.layers[3].weight.data.size()[0])
-        f3 = 0.003
-
-        torch.nn.init.uniform_(self.layers[0].weight.data, -f1, f1)
-        torch.nn.init.uniform_(self.layers[0].bias.data, -f1, f1)
-        torch.nn.init.uniform_(self.layers[3].weight.data, -f2, f2)
-        torch.nn.init.uniform_(self.layers[3].bias.data, -f2, f2)
-        torch.nn.init.uniform_(self.q_value.weight.data, -f3, f3)
-        torch.nn.init.uniform_(self.q_value.bias.data, -f3, f3)
-
     def forward(self, state, action):
-        state_value = self.layers(state)
-        action_value = self.action_value(action)
-        q = self.q_value(F.relu(torch.add(state_value, action_value)))
-
-        return q
+        input = torch.cat([state, action], 1)
+        return self.layers(input)
 
 
 class ActorNetwork(nn.Module):
-    def __init__(self, alpha, state_size, fc1_dims, fc2_dims, action_size) -> None:
+    def __init__(self, alpha, state_size, fc1_dims, fc2_dims, action_size, init_w=3e-3):
         super(ActorNetwork, self).__init__()
-        self.state_size = state_size
-        self.fc1_dims = fc1_dims
-        self.fc2_dims = fc2_dims
-        self.action_size = action_size
+
         self.layers = nn.Sequential(
             nn.Linear(state_size, fc1_dims),
-            nn.LayerNorm(fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
-            nn.LayerNorm(fc2_dims),
             nn.ReLU(),
+            nn.Linear(fc2_dims, action_size),
         )
-        self.mu_value = nn.Linear(self.fc2_dims, action_size)
-        self._init_weights()
+
+        self.layers[4].weight.data.uniform_(-init_w, init_w)
+        self.layers[4].bias.data.uniform_(-init_w, init_w)
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
 
-    def _init_weights(self):
-        f1 = 1 / np.sqrt(self.layers[0].weight.data.size()[0])
-        f2 = 1 / np.sqrt(self.layers[3].weight.data.size()[0])
-        f3 = 0.003
-
-        torch.nn.init.uniform_(self.layers[0].weight.data, -f1, f1)
-        torch.nn.init.uniform_(self.layers[0].bias.data, -f1, f1)
-        torch.nn.init.uniform_(self.layers[3].weight.data, -f2, f2)
-        torch.nn.init.uniform_(self.layers[3].bias.data, -f2, f2)
-        torch.nn.init.uniform_(self.mu_value.weight.data, -f3, f3)
-        torch.nn.init.uniform_(self.mu_value.bias.data, -f3, f3)
-
     def forward(self, state):
-        state_value = self.layers(state)
-        a = torch.tanh(self.mu_value(state_value))
+        return F.tanh(self.layers(state))
 
-        return a
+    def get_action(self, state):
+        state = torch.FloatTensor(state).unsqueeze(0).to(device)
+        action = self.forward(state)
+        return action.detach().cpu().numpy()[0, 0]
 
 
 class DDPG:
     def __init__(self, id, state_size, fc1_size, fc2_size, action_size, seed=0) -> None:
         self.id = id
         self.state_size = state_size
-        self.action_size = action_size
+        self.action_size = action_size.shape[0]
         self.seed = random.seed(seed)
         self.memory = ReplayMemory(BUFFER_SIZE, BATCH_SIZE, seed)
         self.actor = ActorNetwork(
-            ACTOR_LR, state_size, fc1_size, fc2_size, action_size
+            ACTOR_LR, state_size, fc1_size, fc2_size, self.action_size
         ).to(device)
         self.target_actor = ActorNetwork(
-            ACTOR_LR, state_size, fc1_size, fc2_size, action_size
+            ACTOR_LR, state_size, fc1_size, fc2_size, self.action_size
         ).to(device)
         self.critic = CriticNetwork(
-            CRITIC_LR, state_size, fc1_size, fc2_size, action_size
+            CRITIC_LR, state_size, fc1_size, fc2_size, self.action_size
         ).to(device)
         self.target_critic = CriticNetwork(
-            CRITIC_LR, state_size, fc1_size, fc2_size, action_size
+            CRITIC_LR, state_size, fc1_size, fc2_size, self.action_size
         ).to(device)
+        self.ou_noise = OUNoise(action_size)
+        self.ou_noise.reset()
 
         self.timestep = 0
         self._update_target_network(self.actor, self.target_actor, tau=1)
@@ -210,41 +218,30 @@ class DDPG:
     def step(self, state, action, reward, next_state, done):
         self.memory.add_experience(state, action, reward, next_state, done)
         self.timestep += 1
-        if self.timestep % UPDATE_EVERY == 0:
-            if len(self.memory) > BATCH_SIZE:
-                sampled_experiences = self.memory.sample()
-                self.learn(sampled_experiences)
+        if len(self.memory) > BATCH_SIZE:
+            sampled_experiences = self.memory.sample()
+            self.learn(sampled_experiences)
 
     def learn(self, experiences):
         states, actions, rewards, next_states, dones = experiences
-        self.target_actor.eval()
-        self.target_critic.eval()
-        self.critic.eval()
 
-        target_actions = self.target_actor.forward(next_states)
-        target_state_actions = self.target_critic.forward(next_states, target_actions)
-        state_actions = self.critic.forward(states, actions)
+        actor_loss = self.critic(states, self.actor(states))
+        actor_loss = -actor_loss.mean()
 
-        targets = []
-        for i in range(BATCH_SIZE):
-            targets.append(rewards[i] + GAMMA * target_state_actions[i] * dones[i])
-        targets = torch.tensor(targets).to(device)
-        targets = targets.view(BATCH_SIZE, 1)
+        target_action = self.target_actor(next_states)
+        target_value = self.target_critic(next_states, target_action.detach())
+        expected_value = rewards + (1.0 - dones) * GAMMA * target_value
+        expected_value = torch.clamp(expected_value, -np.inf, np.inf)
+        value = self.critic(states, actions)
+        critic_loss = F.mse_loss(value, expected_value.detach())
 
-        self.critic.train()
-        self.critic.optimizer.zero_grad()
-        critic_loss = F.mse_loss(targets, state_actions)
-        critic_loss.backward()
-        self.critic.optimizer.step()
-
-        self.critic.eval()
         self.actor.optimizer.zero_grad()
-        mu = self.actor.forward(states)
-        self.actor.train()
-        actor_loss = -self.critic.forward(states, mu)
-        actor_loss = torch.mean(actor_loss)
         actor_loss.backward()
         self.actor.optimizer.step()
+
+        self.critic.optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic.optimizer.step()
 
         self._update_target_network(self.actor, self.target_actor)
         self._update_target_network(self.critic, self.target_critic)
@@ -260,16 +257,13 @@ class DDPG:
             )
 
     def act(self, state, eps=0.0):
-        rnd = random.random()
-        if rnd < eps:
-            return np.random.uniform(0, 2)
-        else:
-            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
 
-            self.actor.eval()
-            with torch.no_grad():
-                action_values = self.actor(state)
+        self.actor.eval()
+        with torch.no_grad():
+            action_values = self.actor(state)
+            action_values = self.ou_noise.get_action(action_values, self.timestep)
 
-            self.actor.train()
-            action = action_values.cpu().data.numpy()
-            return action.item()
+        self.actor.train()
+        action = action_values.cpu().data.numpy()
+        return action.item()
