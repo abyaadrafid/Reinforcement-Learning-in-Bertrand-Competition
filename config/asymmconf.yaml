@@ -18,7 +18,7 @@ env :
       a : 2
     linear :
 training :
-  algo : ["DQN", "DQN"]
+  algo : ["QL", "QL"]
   bs : 64
   iterations : 50
   exploration:

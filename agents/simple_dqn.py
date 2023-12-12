@@ -33,10 +33,12 @@ class ReplayMemory:
         )
 
     def add_experience(self, state, action, reward, next_state, done):
+        # Wrap as experience
         experience = self.experience(state, action, reward, next_state, done)
         self.memory.append(experience)
 
     def sample(self):
+        # Sample from ReplayMemory
         experiences = random.sample(self.memory, k=self.batch_size)
 
         states = (
@@ -112,7 +114,9 @@ class ReplayMemory:
 
 
 class DQN:
+    # Deep Q Network algorithm
     def __init__(self, id, state_size, fc1_size, fc2_size, action_size, type, seed=0):
+        # fc1_size and fc2_size are linear layer sizes
         self.id = id
         self.state_size = state_size
         self.action_size = action_size
@@ -124,11 +128,16 @@ class DQN:
         self.target_network = DQN_Network(
             self.state_size, fc1_size, fc2_size, self.action_size, seed
         ).to(device)
-        self.optimizer = optim.Adam(self.q_network.parameters())
 
+        # Init optimizer
+        self.optimizer = optim.Adam(self.q_network.parameters(), lr=LR)
+
+        # Replay Memory
         self.memory = ReplayMemory(BUFFER_SIZE, BATCH_SIZE, seed)
         self.timestep = 0
         self.type = type
+
+        # Support for Average reward setting
         if self.type == "avg_reward":
             self.avg_rewards = torch.randn(
                 size=(BATCH_SIZE, 1), requires_grad=True, device="cuda"
@@ -136,38 +145,52 @@ class DQN:
             self.reward_optim = optim.Adam([self.avg_rewards])
 
     def step(self, state, action, reward, next_state, done):
+        # Agent step after environment step
         self.memory.add_experience(state, action, reward, next_state, done)
         self.timestep += 1
         if self.timestep % UPDATE_EVERY == 0:
             if len(self.memory) > BATCH_SIZE:
+                # Sample from memory
                 sampled_experience = self.memory.sample()
+                # Learn from samples
                 self.learn(sampled_experience)
 
     def learn(self, experiences):
+        # Unpack experiences
         states, actions, rewards, next_states, dones = experiences
 
+        # Q output from network
         Q_output = self.q_network(states).gather(1, actions)
 
+        # Q output from target network
         action_values = self.target_network(next_states).detach()
+        # Choose actions for max
         max_action_values = action_values.max(1)[0].unsqueeze(1)
 
-        # update for discounted setting
-        if self.type == "disc_reward":
-            Q_target = rewards + GAMMA * max_action_values * (1 - dones)
         # update for average setting
-        else:
+        if self.type == "avg_reward":
             Q_target = rewards - self.avg_rewards + max_action_values
+        # update for discounted setting
+        else:
+            Q_target = rewards + GAMMA * max_action_values * (1 - dones)
 
+        # Calculate loss
         loss = F.mse_loss(Q_output, Q_target)
 
+        # Set zero grad
         if self.type == "avg_reward":
             self.reward_optim.zero_grad()
         self.optimizer.zero_grad()
+
+        # backprop
         loss.backward()
+
+        # optimizer step
         if self.type == "avg_reward":
             self.reward_optim.step()
         self.optimizer.step()
 
+        # Update fixed target network
         self._update_target_network(self.q_network, self.target_network)
 
     def _update_target_network(self, source_network, target_network):
@@ -179,10 +202,14 @@ class DQN:
             )
 
     def act(self, state, eps=0.0):
+        # Acting on the environment
         rnd = random.random()
+
+        # epsilon action
         if rnd < eps:
             return np.random.randint(self.action_size)
         else:
+            # Greedy action
             state = torch.from_numpy(state).float().unsqueeze(0).to(device)
 
             self.q_network.eval()
@@ -190,6 +217,7 @@ class DQN:
                 action_values = self.q_network(state)
 
             self.q_network.train()
+            # Get action from agent
             action = np.argmax(action_values.cpu().data.numpy())
             return action
 

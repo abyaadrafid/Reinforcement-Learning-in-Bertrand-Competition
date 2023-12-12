@@ -107,6 +107,7 @@ class ReplayMemory:
 
 
 class OUNoise(object):
+    # OU Noise for action, has exploratin built in
     def __init__(
         self,
         action_space,
@@ -145,6 +146,7 @@ class OUNoise(object):
 
 
 class CriticNetwork(nn.Module):
+    # Value network
     def __init__(self, beta, state_size, fc1_dims, fc2_dims, action_size, init_w=3e-3):
         super(CriticNetwork, self).__init__()
 
@@ -165,6 +167,7 @@ class CriticNetwork(nn.Module):
 
 
 class ActorNetwork(nn.Module):
+    # Policy network
     def __init__(self, alpha, state_size, fc1_dims, fc2_dims, action_size, init_w=3e-3):
         super(ActorNetwork, self).__init__()
 
@@ -212,10 +215,13 @@ class DDPG:
         self.ou_noise.reset()
 
         self.timestep = 0
+
+        # intialize target network with current network params
         self._update_target_network(self.actor, self.target_actor, tau=1)
         self._update_target_network(self.critic, self.target_critic, tau=1)
 
     def step(self, state, action, reward, next_state, done):
+        # Agent training step after environment step
         self.memory.add_experience(state, action, reward, next_state, done)
         self.timestep += 1
         if len(self.memory) > BATCH_SIZE:
@@ -223,6 +229,7 @@ class DDPG:
             self.learn(sampled_experiences)
 
     def learn(self, experiences):
+        # Learn from experiences (DDPG update)
         states, actions, rewards, next_states, dones = experiences
 
         actor_loss = self.critic(states, self.actor(states))
@@ -230,8 +237,10 @@ class DDPG:
 
         target_action = self.target_actor(next_states)
         target_value = self.target_critic(next_states, target_action.detach())
+
         expected_value = rewards + (1.0 - dones) * GAMMA * target_value
         expected_value = torch.clamp(expected_value, -np.inf, np.inf)
+
         value = self.critic(states, actions)
         critic_loss = F.mse_loss(value, expected_value.detach())
 
@@ -262,6 +271,7 @@ class DDPG:
         self.actor.eval()
         with torch.no_grad():
             action_values = self.actor(state)
+            # Introduce OU noise to actions
             action_values = self.ou_noise.get_action(action_values, self.timestep)
 
         self.actor.train()

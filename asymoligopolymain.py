@@ -16,15 +16,16 @@ from agents.simple_a2c import A2C
 from agents.simple_ddpg import DDPG
 from agents.simple_dqn import DQN
 from agents.simple_pg import PG
+from agents.simple_ql import QLearner
 from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
 
 EPS_START = 1.0
-EPS_DECAY = 0.9999
+EPS_DECAY = 0.9995
 EPS_MIN = 0.01
 FC1_SIZE = 16
 FC2_SIZE = 32
-MAX_EPISODES = 10
-MAX_STEPS = 50000
+MAX_EPISODES = 100
+MAX_STEPS = 500
 PROCESSES = 5
 
 
@@ -38,6 +39,8 @@ def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
             return PG(id, obs_space, fc1, fc2, action_space)
         case "DDPG":
             return DDPG(id, obs_space, fc1, fc2, action_space)
+        case "QL":
+            return QLearner(id, obs_space, action_space)
 
 
 @hydra.main(version_base=None, config_path="config/", config_name="asymmconf.yaml")
@@ -55,9 +58,7 @@ def train(cfg: DictConfig):
 
 
 def run(cfg: DictConfig, process_name):
-    wandb.init(
-        project="deb", group="avg", name="DQN_avg_DUO_5M_6act" + str(process_name)
-    )
+    wandb.init(project="deb", group="QL", name="QL_Duopoly" + str(process_name))
     # init env
     env = SimpleOligopolyEnv(seed=random.randint(0, 255), config=cfg.env)
     env.action_space = (
@@ -76,7 +77,7 @@ def run(cfg: DictConfig, process_name):
         make_agents(
             id,
             type,
-            env.observation_space.shape[0],
+            env.observation_space,
             FC1_SIZE,
             FC2_SIZE,
             env.action_space.n if env.action_type == "disc" else 1,

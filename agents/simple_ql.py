@@ -15,7 +15,7 @@ class QLearner:
         self._init_q_table()
 
     def _init_q_table(self):
-        DISCRETE_OS_SIZE = [20] * len(self.observation_space.high)
+        DISCRETE_OS_SIZE = [6] * len(self.observation_space.high)
         self.discrete_os_win_size = (
             self.observation_space.high - self.observation_space.low
         ) / DISCRETE_OS_SIZE
