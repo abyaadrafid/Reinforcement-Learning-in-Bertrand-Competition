@@ -58,7 +58,9 @@ def train(cfg: DictConfig):
 
 
 def run(cfg: DictConfig, process_name):
-    wandb.init(project="deb", group="QL", name="QL_Duopoly" + str(process_name))
+    wandb.init(
+        project="QLearning", group="Monopoly", name="6act_1e-6_50k" + str(process_name)
+    )
     # init env
     env = SimpleOligopolyEnv(seed=random.randint(0, 255), config=cfg.env)
     env.action_space = (
@@ -89,21 +91,32 @@ def run(cfg: DictConfig, process_name):
     all_actions = [] * cfg.env.num_sellers
 
     for episode in range(1, MAX_EPISODES + 1):
+        # Every episode
         states, _ = env.reset()
         for _ in range(MAX_STEPS):
+            # Every step
+
+            # Collect actions from each agent and turn them into a dict
             actions = {}
             for agent in agents:
                 actions[agent.id] = agent.act(states.get(agent.id), eps)
+
+            # Take multi-agent step in the env
             next_states, rewards, dones, _, infos = env.step(actions)
+
+            # Loop through every agent
             for agent in agents:
+                # Collect values for each
                 state = states.get(agent.id)
                 action = actions.get(agent.id)
                 next_state = next_states.get(agent.id)
                 reward = rewards.get(agent.id)
                 done = dones.get(agent.id)
+                # Take training step
                 agent.step(state, action, reward, next_state, done)
             states = next_states
 
+            # log each step
             prices = [
                 env.possible_actions[action] if env.action_type == "disc" else action
                 for action in actions.values()
@@ -117,8 +130,10 @@ def run(cfg: DictConfig, process_name):
 
             if done:
                 break
+            # Epsilon decay
             eps = max(eps * EPS_DECAY, EPS_MIN)
 
+        # log each episode
         print(f"Progress {episode} / {MAX_EPISODES} :")
         print(f"epsilon : {eps}")
         wandb.log({"epsilon": eps})

@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 
-LR = 5e-7
+LR = 1e-6
 GAMMA = 0.95
 
 
@@ -17,7 +17,7 @@ class QLearner:
     def _init_q_table(self):
         # Q table size = discrete actions * discrete observations
         # Convert observation space into chunks of our choosing
-
+        # MOVE DISCRETE OBSERVATION SPACE TO CONFIG
         DISCRETE_OS_SIZE = [6] * len(self.observation_space.high)
         self.discrete_os_win_size = (
             self.observation_space.high - self.observation_space.low
