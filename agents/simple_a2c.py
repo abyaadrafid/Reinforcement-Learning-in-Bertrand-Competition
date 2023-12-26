@@ -16,13 +16,16 @@ GAMMA = 0.99
 
 
 class A2C(BaseAgent):
-    def __init__(self, id, state_size, FC1_SIZE, FC2_SIZE, action_size):
+    def __init__(self, id, state_size, FC1_SIZE, FC2_SIZE, action_size, action_type):
         self.id = id
         self.gamma = GAMMA
         self.action_size = action_size
         self.state_size = state_size
         self.actor_critic = ActorCritic_Network(
-            state_size.shape[0], action_size.shape[0], FC1_SIZE, FC2_SIZE
+            state_size.shape[0],
+            action_size.shape[0] if action_type == "cont" else action_size.n,
+            FC1_SIZE,
+            FC2_SIZE,
         ).to(device)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), LR)
         self.log_probs = None
