@@ -1,18 +1,15 @@
-import random
 import sys
 from pathlib import Path
-
-import numpy as np
 
 path_root = Path(__file__).parents[1]
 sys.path.append(str(path_root))
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
-from torch.distributions import Categorical
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-LR = 1e-5
+LR = 1e-4
 GAMMA = 0.99
 
 
@@ -21,26 +18,24 @@ class A2C:
         self.id = id
         self.gamma = GAMMA
         self.action_size = action_size
+        self.state_size = state_size
         self.actor_critic = ActorCritic_Network(
-            state_size, action_size, FC1_SIZE, FC2_SIZE
+            state_size.shape[0], action_size, FC1_SIZE, FC2_SIZE
         ).to(device)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), LR)
         self.log_probs = None
 
     def act(self, state, eps=0.0):
-        action_probs, _ = self.actor_critic.forward(torch.tensor(state).to(device))
-
-        rnd = random.random()
-        if rnd < eps:
-            action = torch.randint(low=0, high=self.action_size, size=(1,))
-        else:
-            action = action_probs.sample()
-
-        self.log_probs = action_probs.log_prob(action)
-
-        return action.item()
+        action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
+        action_probs = F.softmax(action_logits)
+        action = action_probs.multinomial(num_samples=1)
+        return action
 
     def step(self, state, action, reward, next_state, done):
+        action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
+        log_probs = F.log_softmax(action_logits)
+        self.log_probs = log_probs[int(action)]
+
         self._learn(state, next_state, reward, done)
 
     def _learn(self, state, next_state, reward, done):
@@ -70,9 +65,7 @@ class ActorCritic_Network(nn.Module):
             nn.ReLU(),
         )
 
-        self.actor = nn.Sequential(
-            self.stem, nn.Linear(fc2_size, action_size), nn.Softmax()
-        )
+        self.actor = nn.Sequential(self.stem, nn.Linear(fc2_size, action_size))
 
         self.critic = nn.Sequential(
             self.stem,
@@ -83,6 +76,5 @@ class ActorCritic_Network(nn.Module):
         x = x.float()
         value = self.critic(x)
         probabilities = self.actor(x)
-        dist = Categorical(probabilities)
 
-        return dist, value
+        return probabilities, value
