@@ -12,6 +12,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from agents.base_agent import BaseAgent
+
 TAU = 1e-3
 LR = 1e-5
 GAMMA = 0.99
@@ -113,7 +115,7 @@ class ReplayMemory:
         return len(self.memory)
 
 
-class DQN:
+class DQN(BaseAgent):
     # Deep Q Network algorithm
     def __init__(self, id, state_size, fc1_size, fc2_size, action_size, type, seed=0):
         # fc1_size and fc2_size are linear layer sizes
@@ -153,9 +155,9 @@ class DQN:
                 # Sample from memory
                 sampled_experience = self.memory.sample()
                 # Learn from samples
-                self.learn(sampled_experience)
+                self._learn(sampled_experience)
 
-    def learn(self, experiences):
+    def _learn(self, experiences):
         # Unpack experiences
         states, actions, rewards, next_states, dones = experiences
 
@@ -212,11 +214,9 @@ class DQN:
             # Greedy action
             state = torch.from_numpy(state).float().unsqueeze(0).to(device)
 
-            self.q_network.eval()
             with torch.no_grad():
                 action_values = self.q_network(state)
 
-            self.q_network.train()
             # Get action from agent
             action = np.argmax(action_values.cpu().data.numpy())
             return action

@@ -4,12 +4,14 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 
+from agents.base_agent import BaseAgent
+
 GAMMA = 0.99
 LR = 1e-3
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class PG:
+class PG(BaseAgent):
     def __init__(self, id, state_size, fc1_size, fc2_size, action_size):
         self.id = id
         self.policy_network = PolicyNetwork(
@@ -34,9 +36,9 @@ class PG:
     def step(self, state, action, reward, next_state, done):
         self.store_rewards(reward)
         if done:
-            self.learn()
+            self._learn()
 
-    def learn(self):
+    def _learn(self):
         self.optimizer.zero_grad()
         G = np.zeros_like(self.reward_memory, dtype=np.float64)
         for t in range(len(self.reward_memory)):

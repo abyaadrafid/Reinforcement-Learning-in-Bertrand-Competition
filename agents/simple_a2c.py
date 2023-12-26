@@ -8,19 +8,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from agents.base_agent import BaseAgent
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 LR = 1e-4
 GAMMA = 0.99
 
 
-class A2C:
+class A2C(BaseAgent):
     def __init__(self, id, state_size, FC1_SIZE, FC2_SIZE, action_size):
         self.id = id
         self.gamma = GAMMA
         self.action_size = action_size
         self.state_size = state_size
         self.actor_critic = ActorCritic_Network(
-            state_size.shape[0], action_size, FC1_SIZE, FC2_SIZE
+            state_size.shape[0], action_size.shape[0], FC1_SIZE, FC2_SIZE
         ).to(device)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), LR)
         self.log_probs = None

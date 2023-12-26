@@ -7,6 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from agents.base_agent import BaseAgent
+
 TAU = 5e-4
 ACTOR_LR = 1e-5
 CRITIC_LR = 1e-6
@@ -212,7 +214,7 @@ class ActorNetwork(nn.Module):
         return action.detach().cpu().numpy()[0, 0]
 
 
-class DDPG:
+class DDPG(BaseAgent):
     def __init__(
         self, id, state_space, fc1_size, fc2_size, action_space, seed=0
     ) -> None:
@@ -266,9 +268,9 @@ class DDPG:
         self.timestep += 1
         if len(self.memory) > BATCH_SIZE:
             sampled_experiences = self.memory.sample()
-            self.learn(sampled_experiences)
+            self._learn(sampled_experiences)
 
-    def learn(self, experiences):
+    def _learn(self, experiences):
         # Learn from experiences (DDPG update)
         states, actions, rewards, next_states, dones = experiences
 
