@@ -17,10 +17,11 @@ GAMMA = 0.99
 
 class A2C(BaseAgent):
     def __init__(self, id, state_size, FC1_SIZE, FC2_SIZE, action_size, action_type):
-        self.id = id
+        super().__init__(id)
         self.gamma = GAMMA
         self.action_size = action_size
         self.state_size = state_size
+        self.action_type = action_type
         self.actor_critic = ActorCritic_Network(
             state_size.shape[0],
             action_size.shape[0] if action_type == "cont" else action_size.n,
@@ -32,15 +33,22 @@ class A2C(BaseAgent):
 
     def act(self, state, eps=0.0):
         action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
-        action_probs = F.softmax(action_logits)
-        action = action_probs.multinomial(num_samples=1)
+
+        if self.action_type == "disc":
+            action_probs = F.softmax(action_logits)
+            action = action_probs.multinomial(num_samples=1)
+        else:
+            action_probs = F.sigmoid(action_logits)
+            action = (
+                action_probs * (self.action_size.high - self.action_size.low)
+                + self.action_size.low
+            )
         return action
 
     def step(self, state, action, reward, next_state, done):
         action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
         log_probs = F.log_softmax(action_logits)
         self.log_probs = log_probs[int(action)]
-
         self._learn(state, next_state, reward, done)
 
     def _learn(self, state, next_state, reward, done):
