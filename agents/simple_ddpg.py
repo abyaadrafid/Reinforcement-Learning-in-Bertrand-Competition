@@ -8,13 +8,29 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 TAU = 5e-4
-ACTOR_LR = 1e-3
-CRITIC_LR = 1e-4
+ACTOR_LR = 1e-5
+CRITIC_LR = 1e-6
 GAMMA = 0.99
 UPDATE_EVERY = 4
 BUFFER_SIZE = int(1e5)
 BATCH_SIZE = 64
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+class ActionNormalizer:
+    def __init__(self, low, high):
+        self.low = low
+        self.high = high
+
+    def _agent_to_env(self, action):
+        action = self.low + (action + 1.0) * 0.5 * (self.high - self.low)
+        action = np.clip(action, self.low, self.high)
+        return action
+
+    def _env_to_agent(self, action):
+        action = 2 * (action - self.low) / (self.high - self.low) - 1
+        action = np.clip(action, self.low, self.high)
+        return action
 
 
 class ReplayMemory:
@@ -107,7 +123,7 @@ class ReplayMemory:
 
 
 class OUNoise(object):
-    # OU Noise for action, has exploratin built in
+    # OU Noise for action, has exploration built in
     def __init__(
         self,
         action_space,
@@ -115,7 +131,7 @@ class OUNoise(object):
         theta=0.15,
         max_sigma=0.3,
         min_sigma=0.3,
-        decay_period=100000,
+        decay_period=5000,
     ):
         self.mu = mu
         self.theta = theta
@@ -147,11 +163,13 @@ class OUNoise(object):
 
 class CriticNetwork(nn.Module):
     # Value network
-    def __init__(self, beta, state_size, fc1_dims, fc2_dims, action_size, init_w=3e-3):
+    def __init__(
+        self, beta, state_space, fc1_dims, fc2_dims, action_space, init_w=3e-3
+    ):
         super(CriticNetwork, self).__init__()
 
         self.layers = nn.Sequential(
-            nn.Linear(state_size + action_size, fc1_dims),
+            nn.Linear(state_space + action_space, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
             nn.ReLU(),
@@ -168,15 +186,17 @@ class CriticNetwork(nn.Module):
 
 class ActorNetwork(nn.Module):
     # Policy network
-    def __init__(self, alpha, state_size, fc1_dims, fc2_dims, action_size, init_w=3e-3):
+    def __init__(
+        self, alpha, state_space, fc1_dims, fc2_dims, action_space, init_w=3e-3
+    ):
         super(ActorNetwork, self).__init__()
 
         self.layers = nn.Sequential(
-            nn.Linear(state_size, fc1_dims),
+            nn.Linear(state_space, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
             nn.ReLU(),
-            nn.Linear(fc2_dims, action_size),
+            nn.Linear(fc2_dims, action_space),
         )
 
         self.layers[4].weight.data.uniform_(-init_w, init_w)
@@ -193,25 +213,44 @@ class ActorNetwork(nn.Module):
 
 
 class DDPG:
-    def __init__(self, id, state_size, fc1_size, fc2_size, action_size, seed=0) -> None:
+    def __init__(
+        self, id, state_space, fc1_size, fc2_size, action_space, seed=0
+    ) -> None:
         self.id = id
-        self.state_size = state_size
-        self.action_size = action_size.shape[0]
+        self.state_space = state_space
+        self.action_space = action_space
         self.seed = random.seed(seed)
         self.memory = ReplayMemory(BUFFER_SIZE, BATCH_SIZE, seed)
+        self.action_normalizer = ActionNormalizer(state_space.low, state_space.high)
         self.actor = ActorNetwork(
-            ACTOR_LR, state_size, fc1_size, fc2_size, self.action_size
+            ACTOR_LR,
+            state_space.shape[0],
+            fc1_size,
+            fc2_size,
+            self.action_space.shape[0],
         ).to(device)
         self.target_actor = ActorNetwork(
-            ACTOR_LR, state_size, fc1_size, fc2_size, self.action_size
+            ACTOR_LR,
+            state_space.shape[0],
+            fc1_size,
+            fc2_size,
+            self.action_space.shape[0],
         ).to(device)
         self.critic = CriticNetwork(
-            CRITIC_LR, state_size, fc1_size, fc2_size, self.action_size
+            CRITIC_LR,
+            state_space.shape[0],
+            fc1_size,
+            fc2_size,
+            self.action_space.shape[0],
         ).to(device)
         self.target_critic = CriticNetwork(
-            CRITIC_LR, state_size, fc1_size, fc2_size, self.action_size
+            CRITIC_LR,
+            state_space.shape[0],
+            fc1_size,
+            fc2_size,
+            self.action_space.shape[0],
         ).to(device)
-        self.ou_noise = OUNoise(action_size)
+        self.ou_noise = OUNoise(action_space)
         self.ou_noise.reset()
 
         self.timestep = 0
@@ -222,6 +261,7 @@ class DDPG:
 
     def step(self, state, action, reward, next_state, done):
         # Agent training step after environment step
+        action = self.action_normalizer._env_to_agent(action)
         self.memory.add_experience(state, action, reward, next_state, done)
         self.timestep += 1
         if len(self.memory) > BATCH_SIZE:
@@ -255,9 +295,7 @@ class DDPG:
         self._update_target_network(self.actor, self.target_actor)
         self._update_target_network(self.critic, self.target_critic)
 
-    def _update_target_network(self, source_network, target_network, tau=None):
-        if not tau:
-            tau = TAU
+    def _update_target_network(self, source_network, target_network, tau=TAU):
         for source_parameters, target_parameters in zip(
             source_network.parameters(), target_network.parameters()
         ):
@@ -267,13 +305,9 @@ class DDPG:
 
     def act(self, state, eps=0.0):
         state = torch.from_numpy(state).float().unsqueeze(0).to(device)
-
-        self.actor.eval()
         with torch.no_grad():
             action_values = self.actor(state)
             # Introduce OU noise to actions
             action_values = self.ou_noise.get_action(action_values, self.timestep)
-
-        self.actor.train()
         action = action_values.cpu().data.numpy()
-        return action.item()
+        return self.action_normalizer._agent_to_env(action.item()).item()
