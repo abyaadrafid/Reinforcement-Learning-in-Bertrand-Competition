@@ -1,3 +1,4 @@
+import math
 import random
 
 import hydra
@@ -14,19 +15,16 @@ except RuntimeError:
 import wandb
 from agents.simple_a2c import A2C
 from agents.simple_ddpg import DDPG
-from agents.simple_dqn import DQN
+from agents.simple_dqn import DQN, AvgDQN
 from agents.simple_pg import PG
 from agents.simple_ql import QLearner
 from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
 
-EPS_START = 1.0
-EPS_DECAY = 0.9995
-EPS_MIN = 0.01
-FC1_SIZE = 16
+EPS_BETA = 1e-4
+FC1_SIZE = 32
 FC2_SIZE = 32
-MAX_EPISODES = 100
-MAX_STEPS = 500
-PROCESSES = 5
+MAX_EPISODES = 1
+PROCESSES = 1
 
 
 def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
@@ -34,7 +32,7 @@ def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
         case "A2C":
             return A2C(id, obs_space, fc1, fc2, action_space)
         case "DQN":
-            return DQN(id, obs_space, fc1, fc2, action_space, "avg_reward", seed=seed)
+            return AvgDQN(id, obs_space, fc1, fc2, action_space, seed=seed)
         case "PG":
             return PG(id, obs_space, fc1, fc2, action_space)
         case "DDPG":
@@ -59,7 +57,9 @@ def train(cfg: DictConfig):
 
 def run(cfg: DictConfig, process_name):
     wandb.init(
-        project="QLearning", group="Monopoly", name="6act_1e-6_50k" + str(process_name)
+        project="QLearning",
+        group="fullrun",
+        name="5000*100000_CollusionTest" + str(process_name),
     )
     # init env
     env = SimpleOligopolyEnv(seed=random.randint(0, 255), config=cfg.env)
@@ -82,20 +82,22 @@ def run(cfg: DictConfig, process_name):
             env.observation_space,
             FC1_SIZE,
             FC2_SIZE,
-            env.action_space.n if env.action_type == "disc" else 1,
+            env.action_space,
             seed=random.randint(0, 255),
         )
         for id, type in zip(cfg.env.agent_ids, cfg.training.algo)
     ]
-    eps = EPS_START
     all_actions = [] * cfg.env.num_sellers
+    steps = 0
 
     for episode in range(1, MAX_EPISODES + 1):
         # Every episode
         states, _ = env.reset()
-        for _ in range(MAX_STEPS):
+        for _ in range(cfg.env.max_steps):
             # Every step
-
+            steps += 1
+            # Epsilon decay
+            eps = math.exp(-EPS_BETA * steps)
             # Collect actions from each agent and turn them into a dict
             actions = {}
             for agent in agents:
@@ -127,16 +129,13 @@ def run(cfg: DictConfig, process_name):
             for idx, agent_id in enumerate(cfg.env.agent_ids):
                 prices_dict[f"{agent_id}_prices"] = prices[idx]
             wandb.log(prices_dict)
+            wandb.log({"epsilon": eps})
 
             if done:
                 break
-            # Epsilon decay
-            eps = max(eps * EPS_DECAY, EPS_MIN)
-
         # log each episode
-        print(f"Progress {episode} / {MAX_EPISODES} :")
+        print(f"Progress {episode} / {MAX_EPISODES} (Steps : {steps}):")
         print(f"epsilon : {eps}")
-        wandb.log({"epsilon": eps})
         mean_prices_dict = {}
 
         mean_prices = np.mean(all_actions, axis=0)
