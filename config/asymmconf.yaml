@@ -2,13 +2,13 @@ env :
   name : 'duopoly_env'
   max_price : 2
   min_price : 0
-  num_sellers : 1
+  num_sellers : 2
   num_customers : 30
   memory_size : 1
   action_type : "disc"
   disc_action_size : 6
-  max_steps : 500
-  agent_ids : ["agent0"]
+  max_steps : 100_000
+  agent_ids : ["agent0","agent1"]
   market : 
     demand_type : "Logit"
     logit : 
@@ -18,7 +18,7 @@ env :
       a : 2
     linear :
 training :
-  algo : ["QL"]
+  algo : ["DQN","DQN"]
   bs : 64
   iterations : 50
   exploration:
