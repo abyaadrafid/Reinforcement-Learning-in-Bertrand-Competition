@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 
-LR = 1e-6
+LR = 0.15
 GAMMA = 0.95
 
 
@@ -23,7 +23,7 @@ class QLearner:
             self.observation_space.high - self.observation_space.low
         ) / DISCRETE_OS_SIZE
         self.q_table = np.random.uniform(
-            low=-1, high=0, size=(DISCRETE_OS_SIZE + [self.action_size])
+            low=100, high=100, size=(DISCRETE_OS_SIZE + [self.action_size])
         )
 
     def _discretize_state(self, state):
@@ -46,14 +46,11 @@ class QLearner:
         state, action, reward, next_state, done = experience
 
         # update q table if episode ends
-        if done:
-            max_future_q = np.max(self.q_table[next_state])
-            current_q = self.q_table[state + (action,)]
-            # Q update
-            new_q = (1 - LR) * current_q + LR * (reward + GAMMA * max_future_q)
-            self.q_table[state + (action,)] = new_q
-        else:
-            self.q_table[state + (action,)] = 0
+        max_future_q = np.max(self.q_table[next_state])
+        current_q = self.q_table[state + (action,)]
+        # Q update
+        new_q = (1 - LR) * current_q + LR * (reward + GAMMA * max_future_q)
+        self.q_table[state + (action,)] = new_q
 
     def step(self, state, action, reward, next_state, done):
         # Agent step after environment step
