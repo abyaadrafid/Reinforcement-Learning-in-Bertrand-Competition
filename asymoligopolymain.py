@@ -25,13 +25,16 @@ FC1_SIZE = 32
 FC2_SIZE = 32
 MAX_EPISODES = 1
 PROCESSES = 1
+PRINT_EVERY = 500
 
 
 def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
     match type:
         case "A2C":
             return A2C(id, obs_space, fc1, fc2, action_space)
-        case "DQN":
+        case "DDQN":
+            return DQN(id, obs_space, fc1, fc2, action_space, seed=seed)
+        case "ADQN":
             return AvgDQN(id, obs_space, fc1, fc2, action_space, seed=seed)
         case "PG":
             return PG(id, obs_space, fc1, fc2, action_space)
@@ -57,9 +60,9 @@ def train(cfg: DictConfig):
 
 def run(cfg: DictConfig, process_name):
     wandb.init(
-        project="QLearning",
-        group="fullrun",
-        name="5000*100000_CollusionTest" + str(process_name),
+        project="A2CvA2C",
+        group="6actvQL",
+        name="200k_steps" + str(process_name),
     )
     # init env
     env = SimpleOligopolyEnv(seed=random.randint(0, 255), config=cfg.env)
@@ -128,14 +131,14 @@ def run(cfg: DictConfig, process_name):
             prices_dict = {}
             for idx, agent_id in enumerate(cfg.env.agent_ids):
                 prices_dict[f"{agent_id}_prices"] = prices[idx]
+            prices_dict["epsilon"] = eps
             wandb.log(prices_dict)
-            wandb.log({"epsilon": eps})
 
-            if done:
-                break
-        # log each episode
-        print(f"Progress {episode} / {MAX_EPISODES} (Steps : {steps}):")
-        print(f"epsilon : {eps}")
+            if steps % PRINT_EVERY == 0:
+                print(f"Progress {steps}:")
+                print(f"epsilon : {eps}")
+            # if done:
+            #     break
         mean_prices_dict = {}
 
         mean_prices = np.mean(all_actions, axis=0)
