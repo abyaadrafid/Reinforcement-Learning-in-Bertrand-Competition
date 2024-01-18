@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from gymnasium.spaces.discrete import Discrete
 
 from agents.base_agent import BaseAgent
 
@@ -16,15 +17,17 @@ GAMMA = 0.99
 
 
 class A2C(BaseAgent):
-    def __init__(self, id, state_size, FC1_SIZE, FC2_SIZE, action_size, action_type):
+    def __init__(self, id, state_size, FC1_SIZE, FC2_SIZE, action_space):
         super().__init__(id)
         self.gamma = GAMMA
-        self.action_size = action_size
+        self.action_type = "disc" if isinstance(action_space, Discrete) else "cont"
+        self.action_space = action_space
         self.state_size = state_size
-        self.action_type = action_type
         self.actor_critic = ActorCritic_Network(
             state_size.shape[0],
-            action_size.shape[0] if action_type == "cont" else action_size.n,
+            self.action_space.shape[0]
+            if self.action_type == "cont"
+            else self.action_space.n,
             FC1_SIZE,
             FC2_SIZE,
         ).to(device)

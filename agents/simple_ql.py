@@ -10,7 +10,7 @@ class QLearner:
     def __init__(self, id, observation_space, action_space, seed=0):
         self.id = id
         self.observation_space = observation_space
-        self.action_size = action_space
+        self.action_size = action_space.n
         self.timestep = 0
         self._init_q_table()
 
@@ -18,7 +18,7 @@ class QLearner:
         # Q table size = discrete actions * discrete observations
         # Convert observation space into chunks of our choosing
         # MOVE DISCRETE OBSERVATION SPACE TO CONFIG
-        DISCRETE_OS_SIZE = [6] * len(self.observation_space.high)
+        DISCRETE_OS_SIZE = [32] * len(self.observation_space.high)
         self.discrete_os_win_size = (
             self.observation_space.high - self.observation_space.low
         ) / DISCRETE_OS_SIZE
