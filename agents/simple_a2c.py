@@ -11,7 +11,7 @@ from gymnasium.spaces.discrete import Discrete
 
 from agents.base_agent import BaseAgent
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LR = 1e-4
 GAMMA = 0.99
 
@@ -34,6 +34,12 @@ class A2C(BaseAgent):
         self.optimizer = optim.Adam(self.actor_critic.parameters(), LR)
         self.log_probs = None
 
+    def _denormalize_actions(self, action_probs):
+        return (
+            action_probs * (self.action_space.high - self.action_space.low)
+            + self.action_space.low
+        )
+
     def act(self, state, eps=0.0):
         action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
 
@@ -41,17 +47,17 @@ class A2C(BaseAgent):
             action_probs = F.softmax(action_logits)
             action = action_probs.multinomial(num_samples=1)
         else:
-            action_probs = F.sigmoid(action_logits)
-            action = (
-                action_probs * (self.action_size.high - self.action_size.low)
-                + self.action_size.low
-            )
+            action_probs = F.sigmoid(action_logits).cpu().data.numpy()
+            action = self._denormalize_actions(action_probs)
         return action
 
     def step(self, state, action, reward, next_state, done):
         action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
-        log_probs = F.log_softmax(action_logits)
-        self.log_probs = log_probs[int(action)]
+        if self.action_type == "disc":
+            log_probs = F.log_softmax(action_logits)
+            self.log_probs = log_probs[int(action)]
+        else:
+            self.log_probs = F.logsigmoid(action_logits)
         self._learn(state, next_state, reward, done)
 
     def _learn(self, state, next_state, reward, done):
@@ -71,7 +77,7 @@ class A2C(BaseAgent):
 
 
 class ActorCritic_Network(nn.Module):
-    def __init__(self, state_size, action_size, fc1_size=128, fc2_size=256):
+    def __init__(self, state_size, action_space, fc1_size=128, fc2_size=256):
         super(ActorCritic_Network, self).__init__()
 
         self.stem = nn.Sequential(
@@ -81,7 +87,7 @@ class ActorCritic_Network(nn.Module):
             nn.ReLU(),
         )
 
-        self.actor = nn.Sequential(self.stem, nn.Linear(fc2_size, action_size))
+        self.actor = nn.Sequential(self.stem, nn.Linear(fc2_size, action_space))
 
         self.critic = nn.Sequential(
             self.stem,

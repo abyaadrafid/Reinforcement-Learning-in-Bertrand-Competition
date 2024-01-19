@@ -280,10 +280,10 @@ class AvgDQN(DQN):
 
         # Unpacking and converting to tensor
         state, action, reward, next_state = current_experience
-        state = torch.tensor(state).float()
-        action = torch.tensor(action)
-        reward = torch.tensor(reward).float()
-        next_state = torch.tensor(next_state).float()
+        state = torch.tensor(state).float().to(device)
+        action = torch.tensor(action).to(device)
+        reward = torch.tensor(reward).float().to(device)
+        next_state = torch.tensor(next_state).float().to(device)
 
         with torch.no_grad():
             # Q output from Q network for the current sample
