@@ -62,7 +62,7 @@ class SimpleOligopolyEnv(MultiAgentEnv, gym.Env):
             )
         else:
             self.states = np.random.uniform(
-                low=-self.max_price,
+                low=self.min_price,
                 high=self.max_price,
                 size=(self.memory_size * self.num_sellers),
             )
