@@ -125,6 +125,7 @@ class DQN(BaseAgent):
 
     # Deep Q Network algorithm
     def __init__(self, id, obs_space, fc1_size, fc2_size, action_space, seed=0):
+        super().__init__(id)
         # fc1_size and fc2_size are linear layer sizes
         self.id = id
         self.state_size = obs_space.shape[0]
@@ -148,6 +149,7 @@ class DQN(BaseAgent):
         self.timestep = 0
 
     def step(self, state, action, reward, next_state, done):
+        self.metrics["reward"] = reward
         # Agent step after environment step
         self.memory.add_experience(state, action, reward, next_state, done)
         self.timestep += 1
@@ -182,6 +184,7 @@ class DQN(BaseAgent):
         # backprop
         loss.backward()
 
+        self.losses["total"] = loss.item()
         # optimizer step
         self.optimizer.step()
 
@@ -232,6 +235,7 @@ class AvgDQN(DQN):
 
     def step(self, state, action, reward, next_state, done):
         # Keep the current experience for updating average rewards
+        self.metrics["reward"] = reward
         current_experience = (state, action, reward, next_state)
         # Add to replay buffer
         self.memory.add_experience(state, action, reward, next_state, done)
@@ -269,6 +273,7 @@ class AvgDQN(DQN):
         # backprop
         loss.backward()
 
+        self.losses["total"] = loss.item()
         # optimizer step
         self.optimizer.step()
 
