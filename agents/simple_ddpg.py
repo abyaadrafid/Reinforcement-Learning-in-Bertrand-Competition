@@ -9,12 +9,12 @@ import torch.optim as optim
 
 from agents.base_agent import BaseAgent
 
-TAU = 5e-4
-ACTOR_LR = 1e-5
-CRITIC_LR = 1e-6
+TAU = 1e-4
+ACTOR_LR = 1e-3
+CRITIC_LR = 1e-4
 GAMMA = 0.99
-UPDATE_EVERY = 4
-BUFFER_SIZE = int(1e5)
+UPDATE_EVERY = 20
+BUFFER_SIZE = 5000
 BATCH_SIZE = 64
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -130,9 +130,9 @@ class OUNoise(object):
         self,
         action_space,
         mu=0.0,
-        theta=0.15,
-        max_sigma=0.3,
-        min_sigma=0.3,
+        theta=0.3,
+        max_sigma=0.5,
+        min_sigma=0.01,
         decay_period=5000,
     ):
         self.mu = mu
@@ -218,6 +218,7 @@ class DDPG(BaseAgent):
     def __init__(
         self, id, state_space, fc1_size, fc2_size, action_space, seed=0
     ) -> None:
+        super().__init__(id)
         self.id = id
         self.state_space = state_space
         self.action_space = action_space
@@ -265,6 +266,7 @@ class DDPG(BaseAgent):
         # Agent training step after environment step
         action = self.action_normalizer._env_to_agent(action)
         self.memory.add_experience(state, action, reward, next_state, done)
+        self.metrics["reward"] = reward
         self.timestep += 1
         if len(self.memory) > BATCH_SIZE:
             sampled_experiences = self.memory.sample()
@@ -294,8 +296,12 @@ class DDPG(BaseAgent):
         critic_loss.backward()
         self.critic.optimizer.step()
 
-        self._update_target_network(self.actor, self.target_actor)
-        self._update_target_network(self.critic, self.target_critic)
+        self.losses["actor"] = actor_loss.item()
+        self.losses["critic"] = critic_loss.item()
+
+        if self.timestep % UPDATE_EVERY == 0:
+            self._update_target_network(self.actor, self.target_actor)
+            self._update_target_network(self.critic, self.target_critic)
 
     def _update_target_network(self, source_network, target_network, tau=TAU):
         for source_parameters, target_parameters in zip(
