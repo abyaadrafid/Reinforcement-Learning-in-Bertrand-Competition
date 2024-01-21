@@ -44,10 +44,11 @@ class QLearner:
 
     def learn(self, experience):
         state, action, reward, next_state, done = experience
-
-        # update q table if episode ends
+        # Find maximum possible q value in the next state
         max_future_q = np.max(self.q_table[next_state])
+        # Current Q values all actions in current state
         current_q = self.q_table[state + (action,)]
+
         # Q update
         new_q = (1 - LR) * current_q + LR * (reward + GAMMA * max_future_q)
         self.q_table[state + (action,)] = new_q
