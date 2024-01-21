@@ -20,6 +20,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ActionNormalizer:
+    """
+    Normalize or Denormalize actions. Acts as a wrapper between environment and agent.
+    """
+
     def __init__(self, low, high):
         self.low = low
         self.high = high
@@ -36,6 +40,10 @@ class ActionNormalizer:
 
 
 class ReplayMemory:
+    """
+    Basic Replay buffer
+    """
+
     def __init__(self, buffer_size, batch_size, seed):
         self.batch_size = batch_size
         self.seed = random.seed(seed)
@@ -129,11 +137,11 @@ class OUNoise(object):
     def __init__(
         self,
         action_space,
-        mu=0.0,
-        theta=0.3,
-        max_sigma=0.5,
-        min_sigma=0.01,
-        decay_period=5000,
+        mu=0.0,  # mean of noise distribution
+        theta=0.3,  # rate of mean reversion, basically a scaling factor for mu
+        max_sigma=0.5,  # maximum volatility/amplitude of random fluctuations
+        min_sigma=0.01,  # minimum ditto
+        decay_period=5000,  # number of steps to get to min sigma
     ):
         self.mu = mu
         self.theta = theta
@@ -147,19 +155,23 @@ class OUNoise(object):
         self.reset()
 
     def reset(self):
+        # initialize internal
         self.state = np.ones(self.action_dim) * self.mu
 
     def evolve_state(self):
+        # change noise magnitude
         x = self.state
         dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(self.action_dim)
         self.state = x + dx
         return self.state
 
     def get_action(self, action, t=0):
+        # collecting noise
         ou_state = self.evolve_state()
         self.sigma = self.max_sigma - (self.max_sigma - self.min_sigma) * min(
             1.0, t / self.decay_period
         )
+        # apply noise
         return np.clip(action.cpu() + ou_state, self.low, self.high)
 
 
@@ -177,6 +189,7 @@ class CriticNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(fc2_dims, 1),
         )
+        # linear layers need uniform distribution
         self.layers[4].weight.data.uniform_(-init_w, init_w)
         self.layers[4].bias.data.uniform_(-init_w, init_w)
         self.optimizer = optim.Adam(self.parameters(), lr=beta)
@@ -200,12 +213,15 @@ class ActorNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(fc2_dims, action_space),
         )
-
+        # linear layers need uniform distribution
         self.layers[4].weight.data.uniform_(-init_w, init_w)
         self.layers[4].bias.data.uniform_(-init_w, init_w)
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
 
     def forward(self, state):
+        # use tanh for scaled outputs
+        # we use output from this to put into the critic
+        # scaling is important to avoid gradient issues
         return F.tanh(self.layers(state))
 
     def get_action(self, state):
@@ -215,9 +231,15 @@ class ActorNetwork(nn.Module):
 
 
 class DDPG(BaseAgent):
+    """
+    DDPG implementation with fixed targets. Only accepts continuous inputs.
+    Using OUNoise for exploration.
+    """
+
     def __init__(
         self, id, state_space, fc1_size, fc2_size, action_space, seed=0
     ) -> None:
+        # initialize internals
         super().__init__(id)
         self.id = id
         self.state_space = state_space
@@ -227,6 +249,8 @@ class DDPG(BaseAgent):
         self.action_normalizer = ActionNormalizer(
             state_space.low[0], state_space.high[0]
         )
+
+        # Actor networks
         self.actor = ActorNetwork(
             ACTOR_LR,
             state_space.shape[0],
@@ -241,6 +265,8 @@ class DDPG(BaseAgent):
             fc2_size,
             self.action_space.shape[0],
         ).to(device)
+
+        # Critic networks
         self.critic = CriticNetwork(
             CRITIC_LR,
             state_space.shape[0],
@@ -255,6 +281,7 @@ class DDPG(BaseAgent):
             fc2_size,
             self.action_space.shape[0],
         ).to(device)
+
         self.ou_noise = OUNoise(action_space)
         self.ou_noise.reset()
 
@@ -278,18 +305,26 @@ class DDPG(BaseAgent):
         # Learn from experiences (DDPG update)
         states, actions, rewards, next_states, dones = experiences
 
+        # Evaluate state action pair using critic
         actor_loss = self.critic(states, self.actor(states))
+        # Critic tells actor how good the state action pair is
         actor_loss = -actor_loss.mean()
 
+        # Do the same thing with target network and next state
         target_action = self.target_actor(next_states)
         target_value = self.target_critic(next_states, target_action.detach())
 
+        # Bellman equation
         expected_value = rewards + (1.0 - dones) * GAMMA * target_value
+        # Clamp in case nan errors
         expected_value = torch.clamp(expected_value, -np.inf, np.inf)
 
+        # Actual state value
         value = self.critic(states, actions)
+        # Loss is difference between expected state value and actual state value
         critic_loss = F.mse_loss(value, expected_value.detach())
 
+        # optimize
         self.actor.optimizer.zero_grad()
         actor_loss.backward()
         self.actor.optimizer.step()
@@ -301,6 +336,7 @@ class DDPG(BaseAgent):
         self.losses["actor"] = actor_loss.item()
         self.losses["critic"] = critic_loss.item()
 
+        # Hard/Soft update fixed target networks for critic and actor
         if self.timestep % UPDATE_EVERY == 0:
             self._update_target_network(self.actor, self.target_actor)
             self._update_target_network(self.critic, self.target_critic)
@@ -320,4 +356,5 @@ class DDPG(BaseAgent):
             # Introduce OU noise to actions
             action_values = self.ou_noise.get_action(action_values, self.timestep)
         action = action_values.cpu().data.numpy()
+        # remember to rescale input to environment
         return self.action_normalizer._agent_to_env(action.item()).item()
