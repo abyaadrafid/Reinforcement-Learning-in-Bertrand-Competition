@@ -7,17 +7,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from gymnasium.spaces.box import Box
 from gymnasium.spaces.discrete import Discrete
+from torch.distributions import Categorical, Normal
 
 from agents.base_agent import BaseAgent
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LR = 1e-4
 GAMMA = 0.99
+ENTROPY_COEFF = 0.005
 
 
 class A2C(BaseAgent):
-    def __init__(self, id, state_size, FC1_SIZE, FC2_SIZE, action_space):
+    def __init__(
+        self, id, state_size, FC1_SIZE, FC2_SIZE, action_space: Discrete | Box
+    ):
         super().__init__(id)
         self.gamma = GAMMA
         self.action_type = "disc" if isinstance(action_space, Discrete) else "cont"
@@ -25,55 +30,54 @@ class A2C(BaseAgent):
         self.state_size = state_size
         self.actor_critic = ActorCritic_Network(
             state_size.shape[0],
-            self.action_space.shape[0]
+            self.action_space.shape[0] + 1
             if self.action_type == "cont"
             else self.action_space.n,
             FC1_SIZE,
             FC2_SIZE,
         ).to(device)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), LR)
-        self.log_probs = None
 
-    def _denormalize_actions(self, action_probs):
-        return (
-            action_probs * (self.action_space.high - self.action_space.low)
-            + self.action_space.low
-        )
+    def _get_distribution(self, input):
+        if self.action_type == "disc":
+            probs = F.softmax(input, -1)
+            return Categorical(probs)
+        else:
+            return Normal(input[0], torch.exp(input[1]))
 
     def act(self, state, eps=0.0):
-        action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
-
-        if self.action_type == "disc":
-            action_probs = F.softmax(action_logits)
-            action = action_probs.multinomial(num_samples=1)
-        else:
-            action_probs = F.sigmoid(action_logits).cpu().data.numpy()
-            action = self._denormalize_actions(action_probs)
+        with torch.no_grad():
+            action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
+        action_distribution = self._get_distribution(action_logits)
+        action = action_distribution.sample()
+        # if self.action_type == "cont" : action = action.sigmoid() * (self.action_space.high-self.action_space.low) + self.action_space.low
         return action
 
     def step(self, state, action, reward, next_state, done):
-        action_logits, _ = self.actor_critic.forward(torch.tensor(state).to(device))
-        if self.action_type == "disc":
-            log_probs = F.log_softmax(action_logits)
-            self.log_probs = log_probs[int(action)]
-        else:
-            self.log_probs = F.logsigmoid(action_logits)
-        self._learn(state, next_state, reward, done)
+        action_logits, values = self.actor_critic.forward(
+            torch.tensor(state).to(device)
+        )
+        _, next_values = self.actor_critic.forward(torch.tensor(next_state).to(device))
+        action_distribution = self._get_distribution(action_logits)
 
-    def _learn(self, state, next_state, reward, done):
-        _, value = self.actor_critic.forward(torch.tensor(state).to(device))
-        _, next_value = self.actor_critic.forward(torch.tensor(next_state).to(device))
+        self.log_probs = action_distribution.log_prob(action)
+        self.entropy = action_distribution.entropy()
 
-        advantage = reward + self.gamma * next_value * (1 - int(done)) - value
-
+        advantage = reward + self.gamma * next_values * (1 - int(done)) - values
         actor_loss = -self.log_probs * advantage
         critic_loss = 0.5 * (advantage**2)
 
-        loss = actor_loss + critic_loss
+        loss = actor_loss + critic_loss - ENTROPY_COEFF * self.entropy
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+        self.metrics["reward"] = reward
+        self.metrics["entropy"] = self.entropy
+        self.losses["total"] = loss.item()
+        self.losses["critic"] = critic_loss.item()
+        self.losses["actor"] = actor_loss.item()
 
 
 class ActorCritic_Network(nn.Module):
@@ -96,7 +100,7 @@ class ActorCritic_Network(nn.Module):
 
     def forward(self, x):
         x = x.float()
-        value = self.critic(x)
         probabilities = self.actor(x)
+        value = self.critic(x)
 
         return probabilities, value
