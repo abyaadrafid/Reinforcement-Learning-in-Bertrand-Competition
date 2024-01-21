@@ -224,7 +224,9 @@ class DDPG(BaseAgent):
         self.action_space = action_space
         self.seed = random.seed(seed)
         self.memory = ReplayMemory(BUFFER_SIZE, BATCH_SIZE, seed)
-        self.action_normalizer = ActionNormalizer(state_space.low, state_space.high)
+        self.action_normalizer = ActionNormalizer(
+            state_space.low[0], state_space.high[0]
+        )
         self.actor = ActorNetwork(
             ACTOR_LR,
             state_space.shape[0],
