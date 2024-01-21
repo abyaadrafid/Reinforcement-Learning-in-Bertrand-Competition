@@ -51,7 +51,7 @@ class A2C(BaseAgent):
         action_distribution = self._get_distribution(action_logits)
         action = action_distribution.sample()
         # if self.action_type == "cont" : action = action.sigmoid() * (self.action_space.high-self.action_space.low) + self.action_space.low
-        return action
+        return action.cpu()
 
     def step(self, state, action, reward, next_state, done):
         action_logits, values = self.actor_critic.forward(
