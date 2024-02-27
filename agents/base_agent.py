@@ -1,10 +1,15 @@
 class BaseAgent:
+    """
+    Superclass for all agents
+    Simple data structure to collect and log losses and metrics
+    """
+
     def __init__(self, id) -> None:
         self.id = id
         self.losses = {}
         self.metrics = {}
 
-    def act(self, state, eps=0.0):
+    def act(self, state):
         pass
 
     def step(self, state, action, reward, next_state, done):

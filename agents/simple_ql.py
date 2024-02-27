@@ -1,17 +1,33 @@
+import sys
+from pathlib import Path
+
+path_root = Path(__file__).parents[1]
+sys.path.append(str(path_root))
+import math
 import random
 
 import numpy as np
 
+from agents.base_agent import BaseAgent
+
 LR = 0.15
 GAMMA = 0.95
+FIXED_FOR = 50000
+FIXED_ACTION = 0
+EPS_BETA = 1e-4
 
 
-class QLearner:
-    def __init__(self, id, observation_space, action_space, seed=0):
+class QLearner(BaseAgent):
+    def __init__(self, id, observation_space, action_space, fixed: bool, seed=0):
+        super().__init__(id)
         self.id = id
         self.observation_space = observation_space
         self.action_size = action_space.n
+        self.action_space = action_space
         self.timestep = 0
+        self.eps_t = 0
+
+        self.fixed = True if fixed == "True" else False
         self._init_q_table()
 
     def _init_q_table(self):
@@ -33,10 +49,18 @@ class QLearner:
         ) / self.discrete_os_win_size
         return tuple(discrete_state.astype(np.int32))
 
-    def act(self, state, eps=0.0):
+    def act(self, state):
         # Act in the environment
+        if self.fixed and self.timestep <= FIXED_FOR:
+            self.eps = 0
+            return self.action_space.sample()
+        elif self.fixed and self.timestep == FIXED_FOR:
+            self.fixed = False
+        if not self.fixed:
+            self.eps = math.exp(-EPS_BETA * self.eps_t)
+            self.eps_t += 1
         rnd = random.random()
-        if rnd < eps:
+        if rnd < self.eps:
             return np.random.randint(self.action_size)
         else:
             state = self._discretize_state(state)
@@ -55,8 +79,12 @@ class QLearner:
 
     def step(self, state, action, reward, next_state, done):
         # Agent step after environment step
+
         state = self._discretize_state(state)
         next_state = self._discretize_state(next_state)
         self.timestep += 1
+        self.metrics["eps"] = self.eps
+        self.metrics["reward"] = reward
+
         # learning
         self.learn((state, action, reward, next_state, done))

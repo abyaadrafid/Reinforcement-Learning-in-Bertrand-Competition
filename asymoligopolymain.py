@@ -1,4 +1,3 @@
-import math
 import random
 
 import hydra
@@ -6,6 +5,7 @@ import numpy as np
 import torch.multiprocessing as mp
 from gymnasium.spaces import Box, Discrete
 from omegaconf import DictConfig
+from tqdm import tqdm
 
 try:
     mp.set_start_method("spawn")
@@ -15,7 +15,7 @@ except RuntimeError:
 import wandb
 from agents.simple_a2c import A2C
 from agents.simple_ddpg import DDPG
-from agents.simple_dqn import DQN, AvgDQN
+from agents.simple_dqn import DQN, AvgDoubleDQN, AvgDQN
 from agents.simple_pg import PG
 from agents.simple_ql import QLearner
 from environments.SimpleOligopolyEnv import SimpleOligopolyEnv
@@ -28,7 +28,7 @@ PROCESSES = 1
 PRINT_EVERY = 500
 
 
-def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
+def make_agents(id, type, obs_space, fc1, fc2, action_space, fixed, seed):
     match type:
         case "A2C":
             return A2C(id, obs_space, fc1, fc2, action_space)
@@ -41,7 +41,9 @@ def make_agents(id, type, obs_space, fc1, fc2, action_space, seed):
         case "DDPG":
             return DDPG(id, obs_space, fc1, fc2, action_space)
         case "QL":
-            return QLearner(id, obs_space, action_space)
+            return QLearner(id, obs_space, action_space, fixed)
+        case "AvgDoubleDQN":
+            return AvgDoubleDQN(id, obs_space, fc1, fc2, action_space, seed=seed)
 
 
 @hydra.main(version_base=None, config_path="config/", config_name="asymmconf.yaml")
@@ -60,8 +62,8 @@ def train(cfg: DictConfig):
 
 def run(cfg: DictConfig, process_name):
     wandb.init(
-        project="A2CvA2C",
-        group="6actvQL",
+        project="Random50k_ql",
+        group="duopoly_15",
         name="200k_steps" + str(process_name),
     )
     # init env
@@ -86,9 +88,12 @@ def run(cfg: DictConfig, process_name):
             FC1_SIZE,
             FC2_SIZE,
             env.action_space,
+            fixed,
             seed=random.randint(0, 255),
         )
-        for id, type in zip(cfg.env.agent_ids, cfg.training.algo)
+        for id, type, fixed in zip(
+            cfg.env.agent_ids, cfg.training.algo, cfg.training.fixed
+        )
     ]
     all_actions = [] * cfg.env.num_sellers
     steps = 0
@@ -96,19 +101,18 @@ def run(cfg: DictConfig, process_name):
     for episode in range(1, MAX_EPISODES + 1):
         # Every episode
         states, _ = env.reset()
-        for _ in range(cfg.env.max_steps):
+        for _ in tqdm(range(cfg.env.max_steps)):
             # Every step
             steps += 1
-            # Epsilon decay
-            eps = math.exp(-EPS_BETA * steps)
             # Collect actions from each agent and turn them into a dict
             actions = {}
             for agent in agents:
-                actions[agent.id] = agent.act(states.get(agent.id), eps)
+                actions[agent.id] = agent.act(states.get(agent.id))
 
             # Take multi-agent step in the env
             next_states, rewards, dones, _, infos = env.step(actions)
 
+            metrics, losses = [], []
             # Loop through every agent
             for agent in agents:
                 # Collect values for each
@@ -119,6 +123,8 @@ def run(cfg: DictConfig, process_name):
                 done = dones.get(agent.id)
                 # Take training step
                 agent.step(state, action, reward, next_state, done)
+                metrics.append(agent.get_metrics())
+                losses.append(agent.get_losses())
             states = next_states
 
             # log each step
@@ -131,22 +137,15 @@ def run(cfg: DictConfig, process_name):
             prices_dict = {}
             for idx, agent_id in enumerate(cfg.env.agent_ids):
                 prices_dict[f"{agent_id}_prices"] = prices[idx]
-            prices_dict["epsilon"] = eps
+                prices_dict[f"{agent_id}_losses"] = losses[idx]
+                prices_dict[f"{agent_id}_metrics"] = metrics[idx]
             wandb.log(prices_dict)
 
-            if steps % PRINT_EVERY == 0:
-                print(f"Progress {steps}:")
-                print(f"epsilon : {eps}")
+            # if steps % PRINT_EVERY == 0:
+            #     print(f"Progress {steps}:")
+            #     print(f"epsilon : {eps}")
             # if done:
             #     break
-        mean_prices_dict = {}
-
-        mean_prices = np.mean(all_actions, axis=0)
-        for idx, agent in enumerate(agents):
-            mean_prices_dict[f"{agent.id}_mean_prices"] = mean_prices[idx]
-            print(f"Mean price by {agent.id} : {mean_prices[idx]}")
-
-        wandb.log(mean_prices_dict)
 
 
 if __name__ == "__main__":

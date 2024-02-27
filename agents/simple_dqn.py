@@ -3,6 +3,7 @@ from pathlib import Path
 
 path_root = Path(__file__).parents[1]
 sys.path.append(str(path_root))
+import math
 import random
 from collections import deque, namedtuple
 
@@ -18,11 +19,12 @@ from agents.base_agent import BaseAgent
 TAU = 1  # 1 ==> Hard update
 LR = 0.001
 GAMMA = 0.99
-UPDATE_EVERY = 100
-BUFFER_SIZE = int(5000)
+UPDATE_EVERY = 50
+BUFFER_SIZE = int(50000)
 BATCH_SIZE = 32
 # Update step size for average reward estimation
 REWARD_LR = 0.001
+EPS_BETA = 5e-5
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -200,12 +202,13 @@ class DQN(BaseAgent):
                 TAU * source_parameters.data + (1 - TAU) * target_parameters.data
             )
 
-    def act(self, state, eps=0.0):
+    def act(self, state):
         # Acting on the environment
         rnd = random.random()
-
+        self.eps = math.exp(-EPS_BETA * self.timestep)
+        self.metrics["epsilon"] = self.eps
         # epsilon action
-        if rnd < eps:
+        if rnd < self.eps:
             return np.random.randint(self.action_size)
         else:
             # Greedy action
@@ -302,6 +305,43 @@ class AvgDQN(DQN):
             self.avg_rewards = self.avg_rewards + REWARD_LR * (
                 reward - self.avg_rewards + max_action_values - Q_output
             )
+
+
+class AvgDoubleDQN(AvgDQN):
+    def __init__(self, id, obs_space, fc1_size, fc2_size, action_space, seed=0):
+        super().__init__(id, obs_space, fc1_size, fc2_size, action_space, seed)
+
+    def _learn(self, sampled_experience, current_experience):
+        self._update_avg_reward(current_experience)
+        # Unpack
+        states, actions, rewards, next_states, _ = sampled_experience
+
+        Q_output_online = self.q_network(states).gather(1, actions)
+
+        # Use online network to select actions for the next state
+        next_actions_online = self.q_network(next_states).argmax(1, keepdim=True)
+
+        # Q output from target network for the selected actions
+        next_action_values_target = (
+            self.target_network(next_states).detach().gather(1, next_actions_online)
+        )
+        Q_target = rewards - self.avg_rewards + next_action_values_target
+        # Calculate loss
+        loss = F.mse_loss(Q_output_online, Q_target)
+
+        # Set zero grad
+        self.optimizer.zero_grad()
+
+        # backprop
+        loss.backward()
+
+        self.losses["total"] = loss.item()
+        # optimizer step
+        self.optimizer.step()
+
+        # Update fixed target network
+        if self.timestep % UPDATE_EVERY == 0:
+            self._update_target_network(self.q_network, self.target_network)
 
 
 class DQN_Network(nn.Module):
